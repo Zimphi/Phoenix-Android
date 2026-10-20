@@ -68,6 +68,22 @@ passed the stable interface-layout test (five tests total).
 Evidence: `.e2e/ifd-nfc-regression/`.
 The final pairing/settings UI check also passed in `.e2e/ifd-final-pairing-ui/`.
 
+## Phoenix eID Client follow-up
+
+At the user's request, the final installed Android app was tested again with the
+editable Phoenix profile **Max Mustermann**, rather than a PersoSim profile.
+The existing local Phoenix eID Client disclosure bridge read the phone through
+the physical REINER SCT cyberJack RFID basis. The full workflow passed with
+security state `PACE-TA-PA-CA`; PACE, passive authentication and chip authentication
+were verified and the authorized DG4, DG5 and DG8 were returned. TesterArmy
+selected the profile, started the NFC simulation and stopped it afterward.
+An independent post-stop PC/SC probe confirmed that the phone rejected APDUs.
+Evidence: `.e2e/phoenix-client-reiner-final/` and
+`/private/tmp/phoenix-client-reiner-final.log` (2026-10-20, 20:40).
+This check exercises the actual local client runtime, not its Flutter GUI.
+
+## Limits
+
 Five-minute pairing expiration and the five-attempt budget use the unchanged core
 PairingSession. This run did not wait out five minutes or exhaust all five attempts.
 No other phone models, iOS app, or formal TR conformance certification were tested.
