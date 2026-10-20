@@ -140,7 +140,8 @@ import org.json.JSONObject
     var retries by remember(profile.id){mutableStateOf(profile.settings.optInt("pin_retries",3).toString())}
     var uses by remember(profile.id){mutableStateOf(profile.settings.optInt("puk_uses",10).toString())}
     var transport by remember(profile.id){mutableStateOf(profile.settings.optBoolean("transport_pin",false))}
-    val valid=can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex("[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10
+    var eidActive by remember(profile.id){mutableStateOf(profile.settings.optBoolean("eid_active",true))}
+    val valid=can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex(if(transport)"[0-9]{5}" else "[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
         Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {
             Text(profile.name,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy)
@@ -166,8 +167,8 @@ import org.json.JSONObject
             } else {
                 OutlinedTextField(name,{name=it.take(120)},label={Text("Profilname")},singleLine=true,modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp))
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                    listOf(Triple("CAN",can,{v:String->can=v}),Triple("PIN",pin,{v:String->pin=v})).forEach { (label,value,change) ->
-                        OutlinedTextField(value,{change(it.filter(Char::isDigit).take(6))},label={Text(label)},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription=label},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
+                    listOf(Triple("CAN",can,{v:String->can=v}),Triple(if(transport)"Transport-PIN (5 Ziffern)" else "PIN",pin,{v:String->pin=v})).forEach { (label,value,change) ->
+                        OutlinedTextField(value,{change(it.filter(Char::isDigit).take(if(label.startsWith("Transport-PIN"))5 else 6))},label={Text(label)},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription=label},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
                     }
                 }
                 OutlinedTextField(puk,{puk=it.filter(Char::isDigit).take(10)},label={Text("PUK")},singleLine=true,modifier=Modifier.fillMaxWidth().semantics{contentDescription="PUK"},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
@@ -178,13 +179,17 @@ import org.json.JSONObject
                     }
                     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                         Text("Transport-PIN-Modus",fontSize=14.sp,color=Navy,modifier=Modifier.weight(1f))
-                        Switch(transport,{transport=it},enabled=false,modifier=Modifier.semantics{contentDescription="Transport-PIN-Modus"})
+                        Switch(transport,{transport=it},modifier=Modifier.semantics{contentDescription="Transport-PIN-Modus"})
                     }
-                    Text("Verbleibende Versuche / Nutzungen beim Start mit diesen Einstellungen. Transport-PIN ist vorgemerkt; der gemeinsame Core unterstützt sie noch nicht.",fontSize=11.sp,color=Muted)
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Text("eID deaktivieren",fontSize=14.sp,color=Navy,modifier=Modifier.weight(1f))
+                        Switch(!eidActive,{eidActive=!it},modifier=Modifier.semantics{contentDescription="eID deaktivieren"})
+                    }
+                    Text("Transport-PIN: 5 Ziffern, erst nach PIN-Änderung online nutzbar. Deaktivierte eID: PIN-Zugriff gesperrt; CAN-Verwaltung bleibt möglich.",fontSize=11.sp,color=Muted)
                 }
             }
         }
-        if(!groups)Action("Änderungen speichern",enabled=valid,onClick={onSave(name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport))})
+        if(!groups)Action("Änderungen speichern",enabled=valid,onClick={onSave(name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))})
     }
 }
 

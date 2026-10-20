@@ -85,9 +85,12 @@ stored in the draft and included in the native cache identity. PIN counts are
 0–3 and remaining PUK uses 0–10, as enforced by the shared core. These are initial
 card states, not configurable protocol maxima: successful PIN authentication
 restores the standard three tries. Reconnecting the same native profile retains
-its card-owned counters. Transport-PIN remains visibly disabled pending shared
-core support; requesting it through a draft fails explicitly, rather than being
-misrepresented as PIN deactivation.
+its card-owned counters. The transport-PIN flag requires exactly five PIN digits; ordinary PINs require
+six. `eid_active=false` separately sets the existing core PIN activation state.
+Both fields are part of native cache identity. Neither setting changes the signed
+PersoSim identity. Transport PINs allow PIN management via PACE, but cannot
+authorize TA or protected eID disclosure. Changing to a six-digit personal PIN
+does not elevate the old channel; fresh PACE is required.
 
 The app uses the shared `PersonalizedProfile::load -> into_card -> application`
 API for signed profiles. No app-specific APDU or license implementation exists.
@@ -121,3 +124,31 @@ Validation of the 16-profile/editor update on 2026-10-20:
   crashed under Rosetta once; rerunning with `-XX:TieredStopAtLevel=1` passed.
 
 These checks do not claim full official online self-disclosure for all 16 profiles.
+
+### Shared transport-PIN update
+
+Android, the local Simulator component and the Vercel build lock now pin the same
+eID source revision, `107212766ba02ebc788e4f17f5247c8aed6c02c7`. The central
+core preserves its transport-PIN channel restriction in snapshots and cloud
+checkpoints. Inactive eID rejects PIN access (MSE status 6283), while CAN remains
+available for authorized administration. No Android-specific card protocol or
+cloud fallback was added. A compile check with `vercel-cloud` is not a deployment
+or evidence of runtime behavior on Vercel.
+
+Physical verification of both PIN modes on 2026-10-20, Galaxy S23 Ultra and
+REINER SCT cyberJack RFID basis, driven by TesterArmy:
+
+- Five-digit PIN PACE succeeded. An invalid five-digit replacement was rejected,
+  then protected CHANGE REFERENCE DATA replaced it with six digits.
+- After stopping/restarting the same simulated card, fresh PACE with the new
+  personal PIN succeeded, demonstrating persisted credentials.
+- Separately, deactivated eID rejected PIN-based MSE with 6283; CAN PACE and
+  protected CardAccess reading remained available.
+- Both settings persisted after reopening the editor and remained independent.
+  Test values were restored afterward.
+
+The central Rust suite and its cloud-checkpoint policy test passed. Local
+Simulator format checks, full tests and Clippy passed with the same eID commit;
+existing licensed hardware/profile tests retain their explicit ignore status.
+The Vercel worker feature combination (`vercel-owner,experimental-eac`) compiled;
+no online Vercel runtime test is claimed.

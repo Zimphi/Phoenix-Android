@@ -30,10 +30,12 @@ final class Profile {
         Profile profile=new Profile(id,kind,name,groups);
         if(value.has("settings")) {
             JSONObject settings=value.getJSONObject("settings");
-            if(!settings.getString("can").matches("[0-9]{6}") || !settings.getString("pin").matches("[0-9]{6}") || !settings.getString("puk").matches("[0-9]{10}")) throw new JSONException("Ungültige Test-Zugangsdaten");
+            boolean transport=settings.optBoolean("transport_pin",false),eidActive=settings.optBoolean("eid_active",true);
+            if(kind.equals("epassport") && (transport || !eidActive)) throw new JSONException("eID-Einstellungen sind nur für eID verfügbar");
+            if(!settings.getString("can").matches("[0-9]{6}") || !settings.getString("pin").matches(transport?"[0-9]{5}":"[0-9]{6}") || !settings.getString("puk").matches("[0-9]{10}")) throw new JSONException("Ungültige Test-Zugangsdaten");
             int pinRetries=settings.optInt("pin_retries",3),pukUses=settings.optInt("puk_uses",10);
             if(pinRetries<0 || pinRetries>3 || pukUses<0 || pukUses>10) throw new JSONException("PIN-Versuche: 0–3; PUK-Nutzungen: 0–10");
-            profile.settings=new JSONObject().put("can",settings.getString("can")).put("pin",settings.getString("pin")).put("puk",settings.getString("puk")).put("pin_retries",pinRetries).put("puk_uses",pukUses).put("transport_pin",settings.optBoolean("transport_pin",false));
+            profile.settings=new JSONObject().put("can",settings.getString("can")).put("pin",settings.getString("pin")).put("puk",settings.getString("puk")).put("pin_retries",pinRetries).put("puk_uses",pukUses).put("transport_pin",transport).put("eid_active",eidActive);
         }
         return profile;
     }

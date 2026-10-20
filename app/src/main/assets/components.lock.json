@@ -8,7 +8,7 @@
   "eid": {
     "repository": "git@github.com:Zimphi/Phoenix-eID-Core-Rust.git",
     "path": "components/eid",
-    "commit": "c7924354245e122d614fa0ee696a12965a858f79",
+    "commit": "107212766ba02ebc788e4f17f5247c8aed6c02c7",
     "version": "0.1.7"
   },
   "epassport": {

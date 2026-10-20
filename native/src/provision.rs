@@ -16,9 +16,11 @@ struct Settings {can:String,pin:String,puk:String,
     #[serde(default="pin_retries")] pin_retries:u8,
     #[serde(default="puk_uses")] puk_uses:u8,
     #[serde(default)] transport_pin:bool,
+    #[serde(default="eid_active")] eid_active:bool,
 }
 fn pin_retries()->u8{3}
 fn puk_uses()->u8{10}
+fn eid_active()->bool{true}
 #[path="persosim_sources.rs"] mod persosim_sources;
 fn fixture(id:&str)->Option<(&'static str,&'static [u8])>{
     persosim_sources::SOURCES.iter().find(|(key,_,_)|*key==id).map(|(_,file,bytes)|(*file,*bytes))
@@ -99,7 +101,8 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
     let draft:Draft=serde_json::from_value(value)?;
     ensure!(draft.format=="phoenix-android-draft-v1"&&["eid","epassport"].contains(&draft.kind.as_str()),"Unsupported draft");
     pki_admin::identifier(&draft.id)?;
-    ensure!(!draft.settings.transport_pin,"Transport-PIN benötigt Unterstützung im gemeinsamen Core; PIN-Deaktivierung ist kein Ersatz");
+    ensure!(draft.settings.pin.len()==if draft.settings.transport_pin{5}else{6},"PIN-Länge passt nicht zum Transport-PIN-Modus");
+    ensure!(draft.kind=="eid" || (!draft.settings.transport_pin && draft.settings.eid_active),"eID-Einstellungen sind nur für eID-Profile verfügbar");
     let signed=fixture(&draft.id);
     if signed.is_some() {
         let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json"))?;
@@ -120,7 +123,7 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
             let terminal=pki_admin::load(&config.data,"android-terminal",&config.passphrase)?;
             let Authority::Terminal(terminal)=terminal else{anyhow::bail!("Terminal test authority required")};
             let anchor=if signed.is_some(){Some(governikus_anchor()?)}else{None};
-            let credentials=CredentialState::new(draft.settings.pin.as_bytes(),draft.settings.can.as_bytes(),draft.settings.puk.as_bytes(),b"<<<<<<<<<<<<<<<<<<<<<<<<",draft.settings.pin_retries,draft.settings.puk_uses,true,true)?;
+            let credentials=CredentialState::new(draft.settings.pin.as_bytes(),draft.settings.can.as_bytes(),draft.settings.puk.as_bytes(),b"<<<<<<<<<<<<<<<<<<<<<<<<",draft.settings.pin_retries,draft.settings.puk_uses,draft.settings.eid_active,true)?;
             profile_creation::create(&config.profiles.join(&id),&config.passphrase,&profile,&credentials,
                 &CreationPki{csca:document.certificate(),signer,cvca:anchor.as_ref().map(|a|a.key.as_slice()).unwrap_or(&terminal.root().certificate)},
                 &CreationOptions{protocols:Default::default(),authenticated_pin_management:false,mobile_eid_type_info:None,time:chrono::Utc::now().timestamp(),card_date:None,cvca_lineage:vec![],cvca_is_lineage:vec![],cvca_public_key:None,cvca_anchor:anchor.clone(),cvca_authorization:None})?;

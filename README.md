@@ -21,7 +21,9 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
 The app includes 16 signed PersoSim fixtures (01–11 and UB01–UB05), without
 GlobalTester. Signed data stays immutable; editable copies use the local test PKI.
 The editor lists all supported eID DGs directly and exposes CAN, PIN, PUK and
-initial remaining counters. Transport-PIN is reserved pending shared core support.
+initial remaining counters. Transport-PIN (five digits) and deactivated eID are independent settings,
+implemented by the shared eID core. All three eID build pins are identical;
+remaining drift in other component dependencies is recorded separately.
 
 ## Build
 
