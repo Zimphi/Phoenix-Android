@@ -12,7 +12,8 @@ import org.json.JSONObject
 
 /** Device checks use their own draft store and never reset existing app data. */
 class SmokeInstrumentation:Instrumentation() {
-    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);start()}
+    private var activation=false
+    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";start()}
     override fun onStart(){
         val result=Bundle()
         try{
@@ -43,7 +44,25 @@ class SmokeInstrumentation:Instrumentation() {
             val apdu=runCatching{NativeCore.call(JSONObject().put("op","apdu").put("command","00a40400"))}.getOrNull()
             // With no card selected the host may return a card-status rejection, never fabricated success.
             check(apdu==null||apdu.optString("response")!="9000")
-            result.putString("stream","Draft persistence, import validation, hardware key proof, native initialization and both-core inventory passed.")
+            CardService.foreground(true)
+            val stale=CardService.beginStart();CardService.deactivate()
+            check(!CardService.activate(stale)){"Stopped start must remain disarmed"}
+            val paused=CardService.beginStart();CardService.foreground(false)
+            check(!CardService.activate(paused)){"Background start must remain disarmed"}
+            if(activation) {
+                TrialActivation.activate()
+                val defaults=Profile.defaults()
+                for(index in 0 until defaults.length()) {
+                    val draft=defaults.getJSONObject(index)
+                    NativeCore.call(JSONObject().put("op","mount_draft").put("draft",draft))
+                    val command=if(draft.getString("kind")=="epassport")"00a4040c07a0000002471001" else "00a4040c09e80704007f00070302"
+                    val response=NativeCore.call(JSONObject().put("op","apdu").put("command",command)).getString("response")
+                    check(response.endsWith("9000")){"Document selection failed"}
+                    NativeCore.call(JSONObject().put("op","close"))
+                }
+                result.putBoolean("activation_and_document_selection",true)
+            }
+            result.putString("stream",if(activation)"Background trial activation, ePassport/eID personalization and SELECT APDUs passed; stale and paused starts remain disarmed." else "Draft persistence, import validation, hardware key proof, native initialization, both-core inventory and start cancellation passed.")
             finish(Activity.RESULT_OK,result)
         }catch(error:Throwable){result.putString("stream","FAILED at ${error.stackTrace.firstOrNull()}: ${error.javaClass.simpleName}: ${error.message}");finish(Activity.RESULT_CANCELED,result)}
     }

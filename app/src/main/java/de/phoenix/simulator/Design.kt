@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -63,16 +64,6 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
     Icon(painterResource(resource),contentDescription=null,tint=color,modifier=modifier)
 }
 
-@Composable internal fun Chip(modifier:Modifier=Modifier) {
-    Canvas(modifier) {
-        drawRoundRect(Color(0xffd1b975),cornerRadius=CornerRadius(4.dp.toPx()))
-        val ink=Color(0xff7c714e);val w=size.width;val h=size.height
-        drawRoundRect(ink,Offset(w*.3f,h*.25f),Size(w*.4f,h*.5f),CornerRadius(2.dp.toPx()),style=Stroke(1.dp.toPx()))
-        for(y in listOf(.25f,.75f)){drawLine(ink,Offset(0f,h*y),Offset(w*.3f,h*y),1.dp.toPx());drawLine(ink,Offset(w*.7f,h*y),Offset(w,h*y),1.dp.toPx())}
-        drawLine(ink,Offset(w*.5f,0f),Offset(w*.5f,h*.25f),1.dp.toPx());drawLine(ink,Offset(w*.5f,h*.75f),Offset(w*.5f,h),1.dp.toPx())
-    }
-}
-
 @Composable internal fun Art(kind:String,modifier:Modifier=Modifier) {
     val context=LocalContext.current
     val logo=if(kind=="nfc")remember { BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap() }else null
@@ -81,12 +72,25 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
         translate((size.width-160f*factor)/2,(size.height-160f*factor)/2) {scale(factor,factor,pivot=Offset.Zero) {
         val color=Color(0xff9dafec);val stroke=Stroke(1.4f)
         when(kind) {
-            "epassport" -> rotate(-18f,Offset(101f,86f)) {
-                drawCircle(color.copy(alpha=.10f),65f,Offset(101f,86f))
-                drawCircle(color,65f,Offset(101f,86f),style=stroke)
-                for(width in listOf(50f,101f))drawOval(color,Offset(101-width/2,21f),Size(width,130f),style=stroke)
-                for(height in listOf(44f,94f))drawOval(color,Offset(36f,86-height/2),Size(130f,height),style=stroke)
-                drawLine(color,Offset(101f,21f),Offset(101f,151f),1.4f);drawLine(color,Offset(36f,86f),Offset(166f,86f),1.4f)
+            "epassport" -> rotate(9f,Offset(102f,85f)) {
+                val gold=Color(0xffe3c783)
+                drawRoundRect(Color(0xff9cadd5).copy(alpha=.35f),Offset(57f,23f),Size(84f,130f),CornerRadius(5f))
+                drawRoundRect(Brush.linearGradient(listOf(Color(0xff0c203b),Color(0xff20395b))),Offset(52f,17f),Size(84f,130f),CornerRadius(5f))
+                drawLine(Color(0xff405673),Offset(57f,22f),Offset(57f,142f),1f)
+                drawRoundRect(gold.copy(alpha=.22f),Offset(61f,25f),Size(67f,114f),CornerRadius(2f),style=Stroke(.6f))
+                drawCircle(gold,21f,Offset(95f,76f),style=Stroke(1.2f))
+                drawOval(gold,Offset(85f,55f),Size(20f,42f),style=Stroke(1f))
+                drawOval(gold,Offset(74f,69f),Size(42f,14f),style=Stroke(1f))
+                drawLine(gold,Offset(95f,55f),Offset(95f,97f),1f)
+                val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    setColor(gold.toArgb());textAlign=android.graphics.Paint.Align.CENTER
+                    typeface=android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL)
+                    textSize=8f
+                }
+                drawContext.canvas.nativeCanvas.drawText("TEST",95f,42f,paint)
+                paint.textSize=6.7f
+                drawContext.canvas.nativeCanvas.drawText("REISEPASS",95f,115f,paint)
+                drawLine(gold.copy(alpha=.6f),Offset(82f,125f),Offset(108f,125f),.7f)
             }
             "eid" -> rotate(-7f,Offset(100f,83f)) {
                 drawRoundRect(color.copy(alpha=.16f),Offset(33f,43f),Size(126f,84f),CornerRadius(8f))
@@ -121,7 +125,7 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
     }}}
 }
 
-@Composable internal fun Action(label:String,primary:Boolean=true,modifier:Modifier=Modifier,onClick:()->Unit) {
+@Composable internal fun Action(label:String,primary:Boolean=true,modifier:Modifier=Modifier,enabled:Boolean=true,onClick:()->Unit) {
     val icon=when {label.contains("importieren")->"import";label.contains("speichern")->"save";label.contains("kopieren")->"copy";label.contains("starten")->"play";label.contains("beenden")->"stop";label.contains("Profil")||label.contains("hinzufügen")->"add";else->null}
     val accent=if(icon=="stop")Color(0xffdc4657)else Blue
     val content:@Composable RowScope.()->Unit={
@@ -129,8 +133,8 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
         Text(label.removePrefix("＋  "),fontSize=14.sp,fontWeight=FontWeight.SemiBold,letterSpacing=0.sp)
     }
     val shape=RoundedCornerShape(12.dp)
-    if(primary) Button(onClick,modifier.fillMaxWidth().heightIn(min=48.dp).clip(shape).background(Brush.horizontalGradient(listOf(Color(0xff5278ff),Color(0xff4664ff)))),shape=shape,colors=ButtonDefaults.buttonColors(containerColor=Color.Transparent),contentPadding=PaddingValues(12.dp),content=content)
-    else OutlinedButton(onClick,modifier.fillMaxWidth().heightIn(min=48.dp),shape=shape,colors=ButtonDefaults.outlinedButtonColors(contentColor=accent),border=androidx.compose.foundation.BorderStroke(1.dp,accent.copy(alpha=.75f)),contentPadding=PaddingValues(12.dp),content=content)
+    if(primary) Button(onClick,modifier.fillMaxWidth().heightIn(min=48.dp).clip(shape).background(Brush.horizontalGradient(listOf(Color(0xff5278ff),Color(0xff4664ff)))),enabled=enabled,shape=shape,colors=ButtonDefaults.buttonColors(containerColor=Color.Transparent),contentPadding=PaddingValues(12.dp),content=content)
+    else OutlinedButton(onClick,modifier.fillMaxWidth().heightIn(min=48.dp),enabled=enabled,shape=shape,colors=ButtonDefaults.outlinedButtonColors(contentColor=accent),border=androidx.compose.foundation.BorderStroke(1.dp,accent.copy(alpha=.75f)),contentPadding=PaddingValues(12.dp),content=content)
 }
 
 @Composable internal fun Navigation(active:String,onNavigate:(String)->Unit) {
@@ -139,7 +143,7 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
         Row(Modifier.fillMaxWidth().height(65.dp)) {
             for(name in listOf("Profile","Simulation","Über")) {
                 val chosen=name==active
-                Column(Modifier.weight(1f).fillMaxHeight().clickable(role=Role.Tab,onClick={onNavigate(name)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                Column(Modifier.weight(1f).fillMaxHeight().testTag("nav-$name").semantics{selected=chosen}.clickable(role=Role.Tab,onClick={onNavigate(name)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
                     Glyph(name,if(chosen)Blue else Muted)
                     Spacer(Modifier.height(4.dp));Text(name,fontSize=11.sp,color=if(chosen)Blue else Muted)
                     Spacer(Modifier.height(5.dp));Box(Modifier.size(23.dp,2.dp).background(if(chosen)Blue else Color.Transparent,RoundedCornerShape(1.dp)))

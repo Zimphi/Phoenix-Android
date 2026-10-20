@@ -15,31 +15,57 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import org.json.JSONObject
 
-@Composable internal fun ProfileList(profiles:List<Profile>,onSelect:(Profile)->Unit,onCreate:()->Unit) {
+@Composable internal fun ProfileList(profiles:List<Profile>,onSelect:(String)->Unit,onCreate:()->Unit) {
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
             Text("Profile",fontSize=34.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-1.2).sp,color=Navy)
             Text("Lokale Testprofile",fontSize=15.sp,color=Muted)
         }
-        Text("Profil auswählen und bearbeiten.",fontSize=13.sp,color=Muted,modifier=Modifier.padding(top=12.dp,bottom=2.dp))
+        Text("Dokumenttyp auswählen",fontSize=13.sp,color=Muted,modifier=Modifier.padding(top=12.dp,bottom=2.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            profiles.forEach { profile ->
-                Box(Modifier.fillMaxWidth().height(142.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(if(profile.kind=="eid")listOf(Color(0xfff0f2ff),Color(0xffe6ebff))else listOf(Color(0xffe4eaff),Color(0xffd8e1ff)))).clickable{onSelect(profile)}) {
-                    Art(profile.kind,Modifier.align(Alignment.CenterEnd).offset(x=12.dp,y=8.dp).size(160.dp))
+            listOf("epassport","eid").forEach { kind ->
+                val count=profiles.count{it.kind==kind}
+                Box(Modifier.fillMaxWidth().height(142.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(if(kind=="eid")listOf(Color(0xfff0f2ff),Color(0xffe6ebff))else listOf(Color(0xffe4eaff),Color(0xffd8e1ff)))).clickable{onSelect(kind)}) {
+                    Art(kind,Modifier.align(Alignment.CenterEnd).offset(x=12.dp,y=8.dp).size(160.dp))
                     Column(Modifier.fillMaxSize().padding(Inset),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                        Text(profile.label(),fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.8).sp,color=Navy)
-                        Text(profile.name,fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.fillMaxWidth(.76f))
+                        Text(if(kind=="eid")"eID" else "ePassport",fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.8).sp,color=Navy)
+                        Text(if(count==1)"1 Profil vorhanden" else "$count Profile vorhanden",fontSize=13.sp,fontWeight=FontWeight.SemiBold,color=Navy,modifier=Modifier.fillMaxWidth(.72f))
                         Spacer(Modifier.weight(1f))
                         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            if(profile.kind=="epassport")Chip(Modifier.size(29.dp,23.dp)) else Glyph("eid",Muted,Modifier.size(31.dp,25.dp))
-                            Text("Testprofil",fontSize=10.sp,color=Blue,modifier=Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha=.35f)).border(1.dp,Color(0xffb8c8ef),RoundedCornerShape(6.dp)).padding(horizontal=9.dp,vertical=4.dp))
+                            Text(if(count>0)"Profile verfügbar" else "Noch kein Profil",fontSize=10.sp,color=Muted,modifier=Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha=.35f)).border(1.dp,Color(0xffb8c8ef),RoundedCornerShape(6.dp)).padding(horizontal=9.dp,vertical=4.dp))
                         }
                     }
-                    Glyph("chevron",Navy,Modifier.align(Alignment.CenterEnd).padding(end=14.dp).size(22.dp))
+                    if(kind!="eid")Glyph("chevron",Navy,Modifier.align(Alignment.CenterEnd).padding(end=14.dp).size(22.dp))
                 }
             }
         }
         Action("Neues Profil",false,onClick=onCreate)
+    }
+}
+
+@Composable internal fun ProfileSelection(profiles:List<Profile>,kind:String,onSelect:(Profile)->Unit,onCreate:()->Unit) {
+    val label=if(kind=="eid")"eID" else "ePassport"
+    val matching=profiles.filter{it.kind==kind}
+    Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(Space)) {
+        Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Text("$label-Profile",fontSize=30.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.9).sp,color=Navy)
+            Text("${matching.size} ${if(matching.size==1)"Profil" else "Profile"} · Lokal auf diesem Gerät",fontSize=13.sp,color=Muted)
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top=8.dp)) {
+            if(matching.isEmpty())Text("Noch kein $label-Profil vorhanden.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=24.dp))
+            matching.forEach { profile ->
+                Row(Modifier.fillMaxWidth().clickable{onSelect(profile)}.padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                    Box(Modifier.size(52.dp).background(if(kind=="eid")Color(0xffe9efdf)else Color(0xffe5eaff),RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center){if(kind=="epassport")Art(kind,Modifier.size(46.dp).offset(x=(-4).dp))else Glyph(kind,Color(0xff4c6631),Modifier.size(27.dp))}
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                        Text(profile.name,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        Text("$label · Testprofil",fontSize=12.sp,color=Muted)
+                    }
+                    Glyph("chevron",Muted,Modifier.size(20.dp))
+                }
+                HorizontalDivider(color=Border.copy(alpha=.7f))
+            }
+        }
+        Action("Neues $label-Profil",false,onClick=onCreate)
     }
 }
 
@@ -142,6 +168,8 @@ import org.json.JSONObject
 
 @Composable internal fun Simulation(profile:Profile?,status:String,onStart:()->Unit,onStop:()->Unit) {
     val active=status=="Bereit für Lesegerät"&&CardService.active()
+    val starting=status=="Simulation wird gestartet …"
+    val stopping=status=="Simulation wird beendet …"
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val artHeight=(maxHeight-470.dp).coerceIn(96.dp,160.dp)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(Space),horizontalAlignment=Alignment.CenterHorizontally) {
@@ -151,11 +179,10 @@ import org.json.JSONObject
             Text(if(active)"Bereit zum Verbinden" else "Bereit zum Starten",fontSize=23.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.6).sp,color=Navy,textAlign=TextAlign.Center)
             Text("Smartphone an das Lesegerät halten",fontSize=12.sp,color=Muted,textAlign=TextAlign.Center)
         }
-        Text("Lokal auf diesem Smartphone",fontSize=11.sp,color=Blue,modifier=Modifier.background(Pale,RoundedCornerShape(20.dp)).padding(horizontal=16.dp,vertical=5.dp))
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(if(active)"AKTIVES PROFIL" else "AUSGEWÄHLTES PROFIL",fontSize=10.sp,fontWeight=FontWeight.SemiBold,color=Blue)
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(44.dp).background(Color(0xffdfe5ff),RoundedCornerShape(12.dp)),contentAlignment=Alignment.Center){Glyph(profile?.kind?:"Profile",Blue,Modifier.size(26.dp))}
+                Box(Modifier.size(44.dp).background(Color(0xffdfe5ff),RoundedCornerShape(12.dp)),contentAlignment=Alignment.Center){if(profile?.kind=="epassport")Art("epassport",Modifier.size(40.dp).offset(x=(-3).dp))else Glyph(profile?.kind?:"Profile",Blue,Modifier.size(26.dp))}
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
                     Text(profile?.name?:"Kein Profil ausgewählt",fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy)
                     Text("${profile?.label()?:"Testprofil"} · Testprofil",fontSize=12.sp,color=Muted)
@@ -166,7 +193,7 @@ import org.json.JSONObject
                 Glyph("wifi",Muted,Modifier.size(18.dp));Text(status,fontSize=11.sp,color=Muted)
             }
         }
-        if(active)Action("Simulation beenden",false,onClick=onStop) else Action("Simulation starten",onClick=onStart)
+        if(active)Action("Simulation beenden",false,onClick=onStop) else Action(if(starting)"Wird gestartet …" else if(stopping)"Wird beendet …" else "Simulation starten",enabled=!starting&&!stopping,onClick=onStart)
         Text("NFC-Kompatibilität geräteabhängig",fontSize=10.sp,color=Muted)
     }
     }

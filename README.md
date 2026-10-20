@@ -7,7 +7,8 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
 
 ## Contract
 
-- Profile list → editor → settings/data groups; import belongs in the editor.
+- Document type with profile counts → filtered profile list → editor → settings/data
+  groups; import belongs in the editor. Every listed profile shows its document type.
 - About displays actual app/build and bundled core version/commit identifiers.
 - Settings contains Legal, Privacy, licenses and a disabled planned cloud entry.
 - NFC APDUs execute locally through the unchanged core implementation; no
@@ -39,3 +40,7 @@ Native integration and platform limitations: [docs/INTEGRATION.md](docs/INTEGRAT
 licensing boundaries. TesterArmy e2e drives a separately installed app on an
 ADB-connected Android phone: `npm ci && npm run test:e2e`.
 Only synthetic test data are allowed. No model credentials are needed.
+`npm run test:e2e:native` additionally activates through the existing trial relay
+and checks that both profiles can start and stop local simulation through the UI.
+It requires an authorized native build and network access for the existing
+license/time checks; it does not prove NFC radio interoperability.

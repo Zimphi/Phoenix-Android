@@ -7,7 +7,7 @@ import javax.net.ssl.HttpsURLConnection
 /** Existing first-start trial policy. Card APDUs never cross this connection. */
 internal object TrialActivation {
     private const val ENDPOINT="https://phoenix-trial-hash-signing-prototype.phoenix-license-relay.workers.dev/v1/issue-trial-license"
-    fun activate() {
+    @Synchronized fun activate() {
         val state=NativeCore.call(JSONObject().put("op","trial_prepare"))
         if(state.optBoolean("active"))return
         val bytes=state.getJSONObject("request").toString().toByteArray(Charsets.UTF_8)

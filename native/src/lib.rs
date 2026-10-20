@@ -44,7 +44,7 @@ fn dispatch(request: &str) -> Result<Value> {
 }
 fn output(env:&mut JNIEnv, operation:impl FnOnce()->Result<Value>)->jstring {
     let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation));
-    let value=match result {Ok(Ok(value))=>value,Ok(Err(error))=>json!({"error":error.to_string()}),Err(_)=>json!({"error":"Native Kartenoperation abgebrochen"})};
+    let value=match result {Ok(Ok(value))=>value,Ok(Err(error))=>json!({"error":format!("{error:#}")}),Err(_)=>json!({"error":"Native Kartenoperation abgebrochen"})};
     match env.new_string(value.to_string()){Ok(text)=>text.into_raw(),Err(_)=>std::ptr::null_mut()}
 }
 #[no_mangle]

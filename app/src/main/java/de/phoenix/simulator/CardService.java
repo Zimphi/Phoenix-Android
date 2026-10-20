@@ -7,11 +7,17 @@ import java.util.concurrent.*;
 
 public final class CardService extends HostApduService {
     private static boolean active;
+    private static boolean foreground;
     private static long generation;
     private static final ExecutorService worker=Executors.newSingleThreadExecutor();
     static synchronized void deactivate() { active=false; generation++; }
     static synchronized boolean active() { return active; }
-    static synchronized void activate() { active=true; generation++; }
+    static synchronized void foreground(boolean value) { foreground=value; if(!value)deactivate(); }
+    static synchronized long beginStart() { active=false; return ++generation; }
+    static synchronized boolean activate(long session) {
+        if(!foreground || session!=generation) return false;
+        active=true; return true;
+    }
     @Override public byte[] processCommandApdu(byte[] apdu, Bundle extras) {
         final long session;
         synchronized(CardService.class) {

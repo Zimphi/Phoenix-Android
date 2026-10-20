@@ -29,8 +29,8 @@ class MainActivity:ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent { MaterialTheme(typography=PhoenixTypography,colorScheme=lightColorScheme(primary=Blue,onPrimary=androidx.compose.ui.graphics.Color.White,background=Page,surface=Page,onSurface=Navy)) { ProvideTextStyle(TextStyle(fontFamily=PhoenixFont,fontSize=14.sp,lineHeight=TextUnit.Unspecified,letterSpacing=0.sp)) { Phoenix() } } }
     }
-    override fun onResume(){super.onResume();val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,CardService::class.java))}
-    override fun onPause(){NfcAdapter.getDefaultAdapter(this)?.let{if(packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(it).unsetPreferredService(this)};CardService.deactivate();super.onPause()}
+    override fun onResume(){super.onResume();CardService.foreground(true);val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,CardService::class.java))}
+    override fun onPause(){CardService.foreground(false);NfcAdapter.getDefaultAdapter(this)?.let{if(packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(it).unsetPreferredService(this)};super.onPause()}
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -41,6 +41,7 @@ class MainActivity:ComponentActivity() {
     val store=storeResult.getOrNull()
     var page by remember{mutableStateOf("Profile")}
     var selected by remember{mutableStateOf<Profile?>(null)}
+    var selectedKind by remember{mutableStateOf("eid")}
     var revision by remember{mutableIntStateOf(0)}
     var message by remember{mutableStateOf<String?>(null)}
     var legal by remember{mutableStateOf<String?>(null)}
@@ -48,61 +49,95 @@ class MainActivity:ComponentActivity() {
     var editing by remember{mutableStateOf<String?>(null)}
     var choosingGroup by remember{mutableStateOf(false)}
     var status by remember{mutableStateOf("Simulation nicht aktiv")}
+    val coreReady=remember{CompletableDeferred<Unit>()}
+    LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
     LaunchedEffect(Unit) {
-        if(NativeCore.available)withContext(Dispatchers.IO){
+        val initialization=withContext(Dispatchers.IO){
             runCatching {
+                check(NativeCore.available){"Native Core-Bibliothek fehlt"}
                 val proof=LicenseKey.prove(context.applicationContext,NativeCore.bindingChallenge())
                 NativeCore.initialize(context.applicationContext,proof.publicKey,proof.signature)
-                TrialActivation.activate()
-            }.onFailure { android.util.Log.w("Phoenix","Hintergrundinitialisierung noch nicht verfügbar") }
+            }
         }
+        initialization.fold({coreReady.complete(Unit)},{coreReady.completeExceptionally(it)})
+        if(initialization.isSuccess)withContext(Dispatchers.IO){runCatching{TrialActivation.activate()}.onFailure{android.util.Log.w("Phoenix","Hintergrundinitialisierung noch nicht verfügbar")}}
     }
     val clipboard=LocalClipboardManager.current
     val components=remember{JSONObject(context.assets.open("components.lock.json").use{ProfileStore.read(it)})}
     val importer=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri->
         if(uri!=null&&store!=null)scope.launch{
             val result=withContext(Dispatchers.IO){runCatching{context.contentResolver.openInputStream(uri).use{ProfileStore.read(it)}}}
-            result.onSuccess{raw->runCatching{store.importDraft(raw)}.onSuccess{selected=it;revision++;page="Editor"}.onFailure{message=it.message}}.onFailure{message="Import fehlgeschlagen: ${it.message}"}
+            result.onSuccess{raw->runCatching{store.importDraft(raw)}.onSuccess{selected=it;selectedKind=it.kind;revision++;page="Editor"}.onFailure{message=it.message}}.onFailure{message="Import fehlgeschlagen: ${it.message}"}
         }
     }
     if(store==null){Box(Modifier.fillMaxSize().background(Page).padding(24.dp)){Text("Profilspeicher nicht lesbar. Vorhandene Daten bleiben erhalten.",color=Navy)};return}
-    val active=if(page in listOf("Editor","Profile"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
+    fun createProfile(kind:String) {
+        if(store.profiles.size>=100){message="Maximal 100 Profile";return}
+        val draft=Profile.defaults().getJSONObject(if(kind=="eid")1 else 0)
+            .put("id",java.util.UUID.randomUUID().toString()).put("name","Neues ${if(kind=="eid")"eID" else "ePassport"}-Profil")
+        val profile=Profile.parse(draft)
+        store.profiles.add(profile)
+        runCatching{store.save()}.onSuccess{selected=profile;selectedKind=kind;revision++;page="Editor"}.onFailure{store.profiles.remove(profile);message=it.message}
+        creating=false
+    }
+    fun startSimulation() {
+        page="Simulation"
+        val profile=selected
+        val adapter=NfcAdapter.getDefaultAdapter(context)
+        when {
+            status in listOf("Simulation wird gestartet …","Simulation wird beendet …")->Unit
+            profile==null->message="Zuerst ein Profil auswählen"
+            adapter==null||!adapter.isEnabled->message="NFC ist nicht eingeschaltet"
+            !context.packageManager.hasSystemFeature("android.hardware.nfc.hce")->message="Keine NFC-Kartenemulation verfügbar"
+            else->{
+                val session=CardService.beginStart()
+                val draft=profile.json()
+                status="Simulation wird gestartet …"
+                scope.launch {
+                    val result=withContext(Dispatchers.IO){runCatching{
+                        coreReady.await()
+                        TrialActivation.activate()
+                        NativeCore.call(JSONObject().put("op","mount_draft").put("draft",draft))
+                    }}
+                    result.onSuccess {
+                        status=if(page=="Simulation"&&selected?.id==profile.id&&CardService.activate(session))"Bereit für Lesegerät" else "Simulation beendet"
+                    }.onFailure {CardService.deactivate();status="Simulation nicht verfügbar";message=it.message}
+                }
+            }
+        }
+    }
+    val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
     Column(Modifier.fillMaxSize().background(Page).statusBarsPadding().semantics{testTagsAsResourceId=true}) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
             if(page=="Profile"||page=="Simulation") {
                 Brand(Modifier.size(34.dp,42.dp));Spacer(Modifier.width(8.dp));Text("Phoenix",fontSize=20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
             }else{
-                if(page=="Editor"||page=="Einstellungen")IconButton({page=if(page=="Editor")"Profile" else "Über"},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
-                if(page=="Editor") {Spacer(Modifier.weight(1f));Brand(Modifier.size(30.dp,38.dp))}
+                if(page in listOf("Editor","Einstellungen","Profilliste"))IconButton({page=when(page){"Editor"->"Profilliste";"Profilliste"->"Profile";else->"Über"}},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
+                if(page=="Editor"||page=="Profilliste") {Spacer(Modifier.weight(1f));Brand(Modifier.size(30.dp,38.dp))}
                 else Text(page,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.6).sp,color=Navy,modifier=Modifier.weight(1f))
             }
-            if(page!="Einstellungen"&&page!="Editor")IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
+            if(page !in listOf("Einstellungen","Editor","Profilliste"))IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
         }
         Box(Modifier.weight(1f).padding(horizontal=Inset).padding(top=8.dp,bottom=16.dp)) {
             val visibleProfiles=remember(revision){store.profiles.toList()}
             key(Unit) {
                 when(page) {
-                    "Profile"->ProfileList(visibleProfiles,{selected=it;page="Editor"},{creating=true})
+                    "Profile"->ProfileList(visibleProfiles,{selectedKind=it;selected=null;page="Profilliste"},{creating=true})
+                    "Profilliste"->ProfileSelection(visibleProfiles,selectedKind,{selected=it;page="Editor"},{createProfile(selectedKind)})
                     "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{name->
                         val value=name.trim()
                         if(value.isEmpty()||value.length>120)message="Profilname muss 1 bis 120 Zeichen enthalten"
                         else {val old=profile.name;profile.name=value;runCatching{store.save()}.onSuccess{revision++;Toast.makeText(context,"Profilentwurf gespeichert",Toast.LENGTH_SHORT).show()}.onFailure{profile.name=old;message=it.message}}
-                    },{group->if(group.isEmpty())choosingGroup=true else editing=group},{page="Simulation"})}
+                    },{group->if(group.isEmpty())choosingGroup=true else editing=group},::startSimulation)}
                     "Über"->About(components){clipboard.setText(androidx.compose.ui.text.AnnotatedString("Phoenix Android ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n$components"));Toast.makeText(context,"Versionsinfos kopiert",Toast.LENGTH_SHORT).show()}
                     "Einstellungen"->Settings{legal=it}
-                    "Simulation"->Simulation(selected,status,{
-                        val profile=selected
-                        val adapter=NfcAdapter.getDefaultAdapter(context)
-                        when{
-                            profile==null->message="Zuerst ein Profil auswählen"
-                            adapter==null||!adapter.isEnabled->message="NFC ist nicht eingeschaltet"
-                            !context.packageManager.hasSystemFeature("android.hardware.nfc.hce")->message="Keine NFC-Kartenemulation verfügbar"
-                            else->{status="Profil wird geprüft …";scope.launch{
-                                val result=withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","mount_draft").put("draft",profile.json()))}}
-                                result.onSuccess{CardService.activate();status="Bereit für Lesegerät"}.onFailure{CardService.deactivate();status="Simulation nicht verfügbar";message=it.message}
-                            }}
+                    "Simulation"->Simulation(selected,status,::startSimulation,{
+                        CardService.deactivate();status="Simulation wird beendet …"
+                        scope.launch {
+                            withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","close"))}}
+                            status="Simulation beendet"
                         }
-                    },{CardService.deactivate();status="Simulation beendet";scope.launch(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","close"))}}})
+                    })
                 }
             }
         }
@@ -110,10 +145,7 @@ class MainActivity:ComponentActivity() {
     }
     if(message!=null)AlertDialog(onDismissRequest={message=null},title={Text("Phoenix")},text={Text(message!!)},confirmButton={TextButton({message=null}){Text("OK")}})
     if(creating)AlertDialog(onDismissRequest={creating=false},title={Text("Neues Testprofil")},text={Column{
-        listOf("epassport" to "ePassport","eid" to "eID").forEach{(kind,label)->Action(label,false){
-            val profile=Profile(java.util.UUID.randomUUID().toString(),kind,"Neues Testprofil",JSONObject());store.profiles.add(profile)
-            runCatching{store.save()}.onSuccess{selected=profile;revision++;page="Editor"}.onFailure{store.profiles.remove(profile);message=it.message};creating=false
-        }}
+        listOf("epassport" to "ePassport","eid" to "eID").forEach{(kind,label)->Action(label,false){createProfile(kind)}}
     }},confirmButton={},dismissButton={TextButton({creating=false}){Text("Abbrechen")}})
     if(choosingGroup)AlertDialog(onDismissRequest={choosingGroup=false},title={Text("Datengruppe auswählen")},text={Column(Modifier.heightIn(max=350.dp).verticalScroll(rememberScrollState())){
         (1..if(selected?.kind=="eid")22 else 16).forEach{n->TextButton({editing="DG$n";choosingGroup=false},Modifier.fillMaxWidth()){Text("DG$n")}}
