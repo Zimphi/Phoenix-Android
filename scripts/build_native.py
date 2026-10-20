@@ -22,15 +22,36 @@ def environment(ndk, current):
     env['CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS']='-C link-arg=-Wl,-z,max-page-size=16384'
     return env
 
+def verify_dependencies(source, dependencies):
+    for path, expected in dependencies.items():
+        fields = subprocess.run(['git', '-C', str(source), 'ls-tree', 'HEAD', path],
+                                check=True, text=True, capture_output=True).stdout.split()
+        if fields != ['160000', 'commit', expected, path]:
+            raise ValueError(f'Unexpected shared Rust dependency: {path}')
+
 def build(ndk,check):
     from prepare_test_fixture import verify
     verify()
     locations={'host':'simulator','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
-    for name,entry in json.loads((ROOT/'components.lock.json').read_text()).items():
+    lock=json.loads((ROOT/'components.lock.json').read_text())
+    for name,entry in lock.items():
         source=ROOT/'.private'/locations[name]
         actual=subprocess.run(['git','-C',str(source),'rev-parse','HEAD'],check=True,text=True,capture_output=True).stdout.strip()
         if actual!=entry['commit']: raise ValueError(f'Unexpected {name} source revision')
         subprocess.run(['git','-C',str(source),'diff','--quiet','--ignore-submodules','HEAD','--','*.rs','*.toml','build.rs'],check=True)
+        untracked=subprocess.run(['git','-C',str(source),'ls-files','--others','--exclude-standard','--','*.rs','*.toml'],check=True,text=True,capture_output=True).stdout
+        if untracked: raise ValueError(f'Untracked Rust build inputs in {name}')
+    for name, dependencies in {
+        'eid': {'dependencies/epassport': 'epassport',
+                'dependencies/Phoenix-PQC-Rust': 'pqc',
+                'dependencies/Phoenix-License-Client': 'license',
+                'dependencies/eid-reference': 'eid-reference'},
+        'epassport': {'dependencies/Phoenix-PQC-Rust': 'pqc',
+                      'dependencies/Phoenix-License-Client': 'license'},
+        'host': {'components/eid': 'eid', 'components/passport': 'epassport'},
+    }.items():
+        verify_dependencies(ROOT/'.private'/locations[name],
+                            {path: lock[key]['commit'] for path, key in dependencies.items()})
     command=['cargo','check' if check else 'build','--manifest-path',str(ROOT/'native/Cargo.toml'),'--target','aarch64-linux-android','--locked','--offline']
     subprocess.run(command,env=environment(ndk,os.environ),check=True)
     if not check:

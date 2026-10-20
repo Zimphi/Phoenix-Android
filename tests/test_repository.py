@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 import unittest
+import subprocess
+import tomllib
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,54 @@ class RepositoryContract(unittest.TestCase):
         for name in ('eid','epassport','pqc','license','host'):
             self.assertRegex(components[name]['commit'],r'^[0-9a-f]{40}$')
             self.assertTrue(components[name]['version'])
+
+    def test_all_platforms_pin_the_same_transitive_cores(self):
+        workspace = ROOT.parent
+        if not (workspace / 'Phoenix-Vercel/components.lock.json').exists():
+            self.skipTest('Cross-platform check requires the integration workspace')
+        android = json.loads((ROOT / 'components.lock.json').read_text())
+        cloud = json.loads((workspace / 'Phoenix-Vercel/components.lock.json').read_text())
+        local = json.loads((workspace / 'Phoenix-Simulator-Rust/components.lock.json').read_text())
+        names = {'eid': 'Phoenix-eID-Core-Rust', 'epassport': 'Phoenix-ePassport-Core-Rust',
+                 'pqc': 'Phoenix-PQC-Rust', 'license': 'Phoenix-License-Client'}
+        local_components = {entry['name']: entry for entry in local['components']}
+        for name, repository in names.items():
+            expected = android[name]['commit']
+            self.assertEqual(cloud[name]['commit'], expected, name)
+            entry = local_components[repository]
+            self.assertEqual(entry['revision'], expected, name)
+            for build in entry.get('builds', []):
+                self.assertEqual(build['revision'], expected, build['path'])
+        for name in ('eid', 'terminal-rust'):
+            for dependency in ('epassport', 'pqc', 'license'):
+                self.assertEqual(cloud[name]['dependencies'][dependency]['commit'],
+                                 android[dependency]['commit'], name + '/' + dependency)
+        self.assertEqual(android['host']['commit'], subprocess.check_output(
+            ['git', '-C', str(workspace / 'Phoenix-Simulator-Rust'), 'rev-parse', 'HEAD'],
+            text=True).strip())
+
+    def test_shared_registry_dependencies_use_identical_locked_versions(self):
+        def registry(path):
+            result = {}
+            for package in tomllib.loads(path.read_text())['package']:
+                if not package.get('source', '').startswith('registry+'):
+                    continue
+                version = package['version'].split('.')
+                key = (package['name'], version[0], version[1] if version[0] == '0' else '')
+                result.setdefault(key, set()).add((package['version'], package['checksum']))
+            return result
+        expected = registry(ROOT / 'native/Cargo.lock')
+        for relative in ('Phoenix-Simulator-Rust/Cargo.lock', 'Phoenix-Vercel/Cargo.lock',
+                         'Phoenix-Vercel/worker/native-pqc/Cargo.lock',
+                         'Phoenix-Simulator-Rust/components/eid/Cargo.lock',
+                         'Phoenix-Simulator-Rust/components/passport/Cargo.lock',
+                         'Phoenix-Simulator-Rust/components/terminal/Cargo.lock'):
+            path = ROOT.parent / relative
+            if not path.is_file():
+                continue
+            for key, versions in registry(path).items():
+                if key in expected:
+                    self.assertTrue(versions <= expected[key], f'{relative}: {key}: {versions}')
 
     def test_persosim_catalog_has_all_requested_profiles_without_globaltester(self):
         manifest=json.loads((ROOT/'persosim-fixtures.lock.json').read_text())

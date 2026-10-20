@@ -10,14 +10,14 @@ def run(*args, **kw):
 def revision(path):
     return run('git','-C',str(path),'rev-parse','HEAD',capture_output=True).stdout.strip()
 def clone(source,destination,commit):
-    if not destination.exists():
+    fresh=not destination.exists()
+    if fresh:
         destination.mkdir(parents=True)
         run('git','init',str(destination))
-        objects=run('git','-C',str(source),'rev-parse','--git-path','objects',capture_output=True).stdout.strip()
-        objects=(source/objects).resolve() if not Path(objects).is_absolute() else Path(objects)
-        (destination/'.git/objects/info/alternates').write_text(str(objects)+'\n')
-        run('git','-C',str(destination),'checkout','--detach',commit)
-    if revision(destination)!=commit: run('git','-C',str(destination),'checkout','--detach',commit)
+    objects=run('git','-C',str(source),'rev-parse','--git-path','objects',capture_output=True).stdout.strip()
+    objects=(source/objects).resolve() if not Path(objects).is_absolute() else Path(objects)
+    (destination/'.git/objects/info/alternates').write_text(str(objects)+'\n')
+    if fresh or revision(destination)!=commit: run('git','-C',str(destination),'checkout','--detach',commit)
     run('git','-C',str(destination),'diff','--quiet','--ignore-submodules','HEAD','--','*.rs','Cargo.toml','build.rs')
 def link(parent,relative,destination):
     path=parent/relative
@@ -30,7 +30,7 @@ def link(parent,relative,destination):
     if not path.exists(): path.symlink_to(destination,target_is_directory=True)
 def prepare(workspace):
     lock=json.loads((ROOT/'components.lock.json').read_text()); private=ROOT/'.private';private.mkdir(exist_ok=True)
-    sources={'host':workspace/'Phoenix-Simulator-Rust','eid':workspace/'Phoenix-eID-Core-Rust','epassport':workspace/'Phoenix-eID-Core-Rust/dependencies/epassport','pqc':workspace/'Phoenix-PQC-Rust','license':workspace/'Phoenix-License-Client','eid-reference':workspace/'Phoenix-eID-Core-Rust/dependencies/eid-reference'}
+    sources={'host':workspace/'Phoenix-Simulator-Rust','eid':workspace/'Phoenix-eID-Core-Rust','epassport':workspace/'Phoenix-ePassport-Core-Rust','pqc':workspace/'Phoenix-PQC-Rust','license':workspace/'Phoenix-License-Client','eid-reference':workspace/'Phoenix-eID-Core-Rust/dependencies/eid-reference'}
     locations={'host':'simulator','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
     for name,source in sources.items(): clone(source,private/locations[name],lock[name]['commit'])
     link(private,'Phoenix-PQC-Rust',private/'pqc')
