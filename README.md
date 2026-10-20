@@ -44,3 +44,10 @@ Only synthetic test data are allowed. No model credentials are needed.
 and checks that both profiles can start and stop local simulation through the UI.
 It requires an authorized native build and network access for the existing
 license/time checks; it does not prove NFC radio interoperability.
+
+For the physical REINER SCT check, keep the phone unlocked on the reader and run
+`PHOENIX_RF_TEST=1 npm run test:e2e:native`. This opt-in uses the licensed sibling
+`Phoenix-IS-Terminal` through `Phoenix-ePassport-Core/.venv/bin/python`; no core
+sources are copied. It checks application selection, PACE, a protected synthetic
+DG1 (passport) or CardAccess read (eID), and an actual `6985` response after stop.
+Transport failures remain failures. It does not perform full CA/PA/TA conformance.

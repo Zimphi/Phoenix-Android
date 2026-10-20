@@ -16,7 +16,12 @@ Platform work and remaining limits:
   local APDU processing does not mean guaranteed cold-start airplane-mode licensing.
 - Local and Vercel currently pin different commits despite matching version labels.
   Parity must be established before claiming equivalence on all targets.
-- Real NFC interoperability needs an independent reader; ADB/UI tests do not prove RF.
+- A physical REINER SCT cyberJack RFID basis / Samsung SM-S918B check on
+  2026-10-20 passed passport application selection, CardAccess, CAN PACE and a
+  secure-messaging DG1 read matching the synthetic Erika profile. A stopped
+  session returned `6985`. Subsequent attempts lost RF contact (`80100016`,
+  then no card `8010000C`); eID RF and full CA/PA/TA remain unverified.
+  ADB/UI tests alone do not prove RF interoperability.
 
 ## Agreed activation direction
 

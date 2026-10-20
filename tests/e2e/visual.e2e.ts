@@ -16,9 +16,10 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   await expect(screen.getByText('ePassport · Testprofil', { exact: true })).toBeVisible();
   console.log(await app.screenshot('passport-profiles'));
   await screen.getByText('Erika Mustermann', { exact: true }).tap();
+  await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
   await screen.getByText('Datengruppen', { exact: true }).tap();
   await expect(screen.getByText('DG2', { exact: true })).toBeVisible();
-  await expect(screen.getByText('Simulation starten', { exact: true })).toBeVisible();
+  await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('editor'));
   await screen.getByText('Simulation', { exact: true }).tap();
   await expect(screen.getByText('Lokal auf diesem Smartphone', { exact: true })).not.toBeVisible();

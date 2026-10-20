@@ -130,7 +130,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSaveName:(String)->Unit,onEditGroup:(String)->Unit,onSimulate:()->Unit) {
+@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSaveName:(String)->Unit,onEditGroup:(String)->Unit) {
     var groups by remember(profile.id){mutableStateOf(false)}
     var name by remember(profile.id){mutableStateOf(profile.name)}
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
@@ -162,7 +162,6 @@ import org.json.JSONObject
             }
         }
         if(!groups)Action("Änderungen speichern",onClick={onSaveName(name)})
-        Action("Simulation starten",primary=groups,onClick=onSimulate)
     }
 }
 
