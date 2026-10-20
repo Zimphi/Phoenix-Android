@@ -1,0 +1,32 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+android {
+    namespace 'de.phoenix.simulator'
+    compileSdk 35
+    ndkVersion '27.2.12479018'
+    defaultConfig {
+        applicationId 'de.phoenix.simulator'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0-dev'
+        testInstrumentationRunner 'de.phoenix.simulator.SmokeInstrumentation'
+    }
+    buildFeatures { buildConfig true; compose true }
+    kotlinOptions { jvmTarget = "17" }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    packaging { jniLibs { useLegacyPackaging = false } }
+}
+
+dependencies {
+    implementation platform('androidx.compose:compose-bom:2025.04.01')
+    implementation 'androidx.activity:activity-compose:1.10.1'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+}
+
+if (System.getenv("PHOENIX_RUSTLS_MAVEN")) {
+    dependencies { implementation 'rustls:rustls-platform-verifier:0.1.1' }
+}

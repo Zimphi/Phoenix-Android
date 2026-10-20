@@ -1,0 +1,1 @@
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android" android:description="@string/nfc_service" android:requireDeviceUnlock="true"><aid-group android:category="other" android:description="@string/nfc_service"><aid-filter android:name="A0000002471001"/><aid-filter android:name="E80704007F00070302"/></aid-group></host-apdu-service>

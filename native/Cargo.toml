@@ -1,0 +1,27 @@
+[package]
+name = "phoenix-android-adapter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+[lib]
+name = "phoenix_android"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "=1.0.103"
+jni = "=0.21.1"
+serde = { version = "=1.0.219", features = ["derive"] }
+serde_json = "=1.0.140"
+openssl = { version = "=0.10.81", features = ["vendored"] }
+zeroize = "1.8"
+chrono = "=0.4.45"
+libc = "=0.2.189"
+phoenix-eid-core = { path = "../.private/simulator/components/eid", version = "=0.1.7" }
+cav4-local-prototype = { path = "../.private/simulator/components/eid/dependencies/Phoenix-PQC-Rust", version = "=0.2.1" }
+phoenix-simulator = { path = "../.private/simulator", default-features = false }
+phoenix-license-verifier = { path = "../.private/simulator/components/eid/dependencies/Phoenix-License-Client/verifier", version = "=0.1.7" }
+
+[target.'cfg(target_os = "android")'.dependencies]
+rustls-platform-verifier = "=0.5.3"

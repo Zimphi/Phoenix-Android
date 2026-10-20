@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.private/
+.tools/
+.e2e/
+node_modules/
+**/target/
+*.apk
+*.aab
+*.so
+*.aar
+__pycache__/
+.DS_Store

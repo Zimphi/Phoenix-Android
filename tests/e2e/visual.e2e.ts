@@ -1,0 +1,26 @@
+import { test } from '@e2e-dev/mobile';
+import { expect } from 'e2e';
+test('capture the agreed profile and about layouts on the phone', async ({ app, screen }) => {
+  await app.open();
+  await expect(screen.getByText('Lokale Testprofile')).toBeVisible();
+  await expect(screen.getByText('Max Mustermann', { exact: true })).toBeVisible();
+  await expect(screen.getByText(/Neues Profil/)).toBeVisible();
+  console.log(await app.screenshot('profiles'));
+  await screen.getByText('Erika Mustermann', { exact: true }).tap();
+  await screen.getByText('Datengruppen', { exact: true }).tap();
+  await expect(screen.getByText('DG2', { exact: true })).toBeVisible();
+  await expect(screen.getByText('Simulation starten', { exact: true })).toBeVisible();
+  console.log(await app.screenshot('editor'));
+  await screen.getByText('Simulation', { exact: true }).tap();
+  await expect(screen.getByText('NFC-Kompatibilität geräteabhängig', { exact: true })).toBeVisible();
+  await expect(screen.getByText('Simulation starten', { exact: true })).toBeVisible();
+  console.log(await app.screenshot('simulation'));
+  await screen.getByText('Über', { exact: true }).tap();
+  await expect(screen.getByText('Versionsinfos kopieren', { exact: true })).toBeVisible();
+  console.log(await app.screenshot('about'));
+  await screen.getByRole('button', { name: 'Einstellungen' }).tap();
+  await expect(screen.getByText('Cloud-Anbindung', { exact: true })).toBeVisible();
+  await expect(screen.getByText('Lizenzen & Drittanbieter', { exact: true })).toBeVisible();
+  console.log(await app.screenshot('settings'));
+  await screen.getByText('Profile', { exact: true }).tap();
+});

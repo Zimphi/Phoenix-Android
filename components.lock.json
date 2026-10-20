@@ -1,0 +1,38 @@
+{
+  "host": {
+    "repository": "git@github.com:Zimphi/Phoenix-Simulator-Rust.git",
+    "path": ".",
+    "commit": "ef96cd8cec2a51ca2f0eeb667642c79d6ac1d3f5",
+    "version": "0.13.5-rc.2"
+  },
+  "eid": {
+    "repository": "git@github.com:Zimphi/Phoenix-eID-Core-Rust.git",
+    "path": "components/eid",
+    "commit": "e393692b99c2d09d0fd3ad26c8b72bf28e1d1ef6",
+    "version": "0.1.7"
+  },
+  "epassport": {
+    "repository": "git@github.com:Zimphi/Phoenix-ePassport-Core-Rust.git",
+    "path": "components/eid/dependencies/epassport",
+    "commit": "2352b7e4cead5bc94eebf995df15ee7bf4889f1a",
+    "version": "0.4.8"
+  },
+  "pqc": {
+    "repository": "git@github.com:Zimphi/Phoenix-PQC-Rust.git",
+    "path": "components/eid/dependencies/Phoenix-PQC-Rust",
+    "commit": "366655c407bdfef67b6a1249dd190bce44dd0eac",
+    "version": "0.2.1"
+  },
+  "license": {
+    "repository": "git@github.com:Zimphi/Phoenix-License-Client.git",
+    "path": "components/eid/dependencies/Phoenix-License-Client",
+    "commit": "959958b0ee6c07a9c4aeec53591413f1fc2eeae1",
+    "version": "0.1.7"
+  },
+  "eid-reference": {
+    "repository": "git@github.com:Zimphi/Phoenix-eID-Card.git",
+    "commit": "cbabab9c66350b8113058a9cc1d85777367106ef",
+    "path": "components/eid/dependencies/eid-reference",
+    "purpose": "Unmodified community mapping data required by the eID core"
+  }
+}

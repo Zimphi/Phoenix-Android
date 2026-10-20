@@ -1,0 +1,11 @@
+{
+  "name": "phoenix-android-tests",
+  "private": true,
+  "scripts": {
+    "test:e2e": "E2E_TELEMETRY_DISABLED=1 e2e run"
+  },
+  "devDependencies": {
+    "@e2e-dev/mobile": "0.12.3",
+    "e2e": "0.21.1"
+  }
+}

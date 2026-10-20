@@ -1,0 +1,2 @@
+Lucide SVG icons converted to Android vectors; stroke width 1.8.
+https://github.com/lucide-icons/lucide/tree/c29c276f16590cf017126671535ad8c792be64d8/icons
