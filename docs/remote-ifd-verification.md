@@ -82,6 +82,34 @@ Evidence: `.e2e/phoenix-client-reiner-final/` and
 `/private/tmp/phoenix-client-reiner-final.log` (2026-10-20, 20:40).
 This check exercises the actual local client runtime, not its Flutter GUI.
 
+### Subsequent real Phoenix client UI checks
+
+The actual native Flutter macOS client subsequently completed the entire provider,
+transport selection, on-screen PIN and completion workflow with the same editable
+Phoenix profile over both the REINER SCT and physical WLAN Remote IFD. The UI
+displayed successful completion; the independent local service verified the
+signed SOAP result and returned the expected synthetic DG4, DG5 and DG8 values.
+The corrected native client supplies HCE AID routing when initial MF selection
+returns 6A82. Card cores and their pins remain unchanged.
+
+The dedicated TesterArmy desktop-coordination tests both pass:
+`.e2e/phoenix-client-gui-nfc-final/` (84.15 seconds) and
+`.e2e/phoenix-client-gui-ifd-final/` (171.38 seconds). Markers were advanced only
+after observing actual client UI success and verifying the service result.
+The IFD listener rejected fresh LAN connections after Stop; the client retained
+the pairing after restart. The earlier combined run was interrupted while
+awaiting explicit pairing approval and is not counted as passed.
+
+The final Android build also passes the three existing UI tests, type → profile
+selection within Simulation, editor play transfer without automatic start,
+invalid-draft rejection, and unchanged NFC/IFD geometry. The start-page logo is
+larger; the picker displays a passport illustration for ePassport.
+Evidence: `.e2e/simulation-picker-complete/` (the first three cases pass),
+`.e2e/simulation-picker-invalid-confirmed/` (corrected keyboard cleanup),
+and `/private/tmp/phoenix-picker-default-ui.log`. APK build, lint and six
+repository contracts pass. The client has seven passing Python adapter tests
+and 36 passing native unit tests.
+
 ## Limits
 
 Five-minute pairing expiration and the five-attempt budget use the unchanged core

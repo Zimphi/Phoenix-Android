@@ -142,7 +142,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSave:(String,JSONObject)->Unit,onCopy:()->Unit,onEditGroup:(String)->Unit) {
+@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSave:(String,JSONObject)->Boolean,onCopy:()->Unit,onEditGroup:(String)->Unit,onSimulate:()->Unit) {
     var groups by remember(profile.id){mutableStateOf(true)}
     var name by remember(profile.id){mutableStateOf(profile.name)}
     var can by remember(profile.id){mutableStateOf(profile.settings.getString("can"))}
@@ -153,10 +153,14 @@ import org.json.JSONObject
     var transport by remember(profile.id){mutableStateOf(profile.settings.optBoolean("transport_pin",false))}
     var eidActive by remember(profile.id){mutableStateOf(profile.settings.optBoolean("eid_active",true))}
     val valid=can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex(if(transport)"[0-9]{5}" else "[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10
+    val save={onSave(name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))}
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
-        Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
             Text(profile.name,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy)
             Text(if(profile.signedFixture)"eID · Signiertes PersoSim-Profil" else "${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
+        }
+        IconButton({if(save())onSimulate()},enabled=valid,modifier=Modifier.semantics{contentDescription="Profil in Simulation übernehmen"}){Glyph("play",Blue,Modifier.size(28.dp))}
         }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Pale).padding(3.dp)) {
             listOf("Datengruppen","Einstellungen").forEachIndexed { index,label ->
@@ -200,11 +204,11 @@ import org.json.JSONObject
                 }
             }
         }
-        if(!groups)Action("Änderungen speichern",enabled=valid,onClick={onSave(name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))})
+        if(!groups)Action("Änderungen speichern",enabled=valid,onClick={save()})
     }
 }
 
-@Composable internal fun Simulation(profile:Profile?,status:String,onStart:()->Unit,onStop:()->Unit,wlan:Boolean,onMode:(Boolean)->Unit,remote:JSONObject) {
+@Composable internal fun Simulation(profile:Profile?,status:String,onStart:()->Unit,onStop:()->Unit,wlan:Boolean,onMode:(Boolean)->Unit,remote:JSONObject,onSelectProfile:()->Unit) {
     val active=status=="Bereit für Lesegerät"&&(if(wlan)remote.optBoolean("running") else CardService.active())
     val starting=status=="Simulation wird gestartet …"
     val stopping=status=="Simulation wird beendet …"
@@ -228,12 +232,13 @@ import org.json.JSONObject
         }
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(if(active)"AKTIVES PROFIL" else "AUSGEWÄHLTES PROFIL",fontSize=10.sp,fontWeight=FontWeight.SemiBold,color=Blue)
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(enabled=!active&&!starting&&!stopping,onClick=onSelectProfile).semantics{contentDescription="Simulationsprofil auswählen"},verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.size(44.dp).background(Color(0xffdfe5ff),RoundedCornerShape(12.dp)),contentAlignment=Alignment.Center){if(profile?.kind=="epassport")Art("epassport",Modifier.size(40.dp).offset(x=(-3).dp))else Glyph(profile?.kind?:"Profile",Blue,Modifier.size(26.dp))}
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                    Text(profile?.name?:"Kein Profil ausgewählt",fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy)
-                    Text("${profile?.label()?:"Testprofil"} · Testprofil",fontSize=12.sp,color=Muted)
+                    Text(profile?.name?:"Profil auswählen",fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Text("${profile?.label()?:"ePassport oder eID"} · Testprofil",fontSize=12.sp,color=Muted)
                 }
+                Glyph("chevron",Muted,Modifier.size(20.dp))
             }
             HorizontalDivider(color=Border)
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -264,4 +269,32 @@ import org.json.JSONObject
         else Action(if(busy)"Kopplung wird gestartet …" else "Kopplung starten",enabled=!busy,onClick=onPair)
         if(state.optInt("paired")>0&&!busy)Action("Kopplungen entfernen",false,onClick=onForget)
     }
+}
+
+
+@Composable internal fun SimulationProfilePicker(profiles:List<Profile>,onDismiss:()->Unit,onSelect:(Profile)->Unit) {
+    var kind by remember{mutableStateOf<String?>(null)}
+    AlertDialog(onDismissRequest=onDismiss,title={Text(if(kind==null)"Dokumenttyp auswählen" else if(kind=="eid")"eID-Profil auswählen" else "ePassport-Profil auswählen")},text={
+        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                listOf("epassport" to "ePassport","eid" to "eID").forEach{(value,label)->
+                    FilterChip(selected=kind==value,onClick={kind=value},label={Text(label)},leadingIcon={if(value=="epassport")Art(value,Modifier.size(24.dp))else Glyph(value,Blue,Modifier.size(20.dp))})
+                }
+            }
+            kind?.let{selectedKind->
+                val matching=profiles.filter{it.kind==selectedKind}
+                Column(Modifier.heightIn(max=320.dp).verticalScroll(rememberScrollState())) {
+                    if(matching.isEmpty())Text("Noch kein Profil vorhanden.",color=Muted)
+                    matching.forEach{profile->
+                        Row(Modifier.fillMaxWidth().clickable{onSelect(profile)}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                            if(profile.kind=="epassport")Art(profile.kind,Modifier.size(28.dp))else Glyph(profile.kind,Blue,Modifier.size(24.dp))
+                            Text(profile.name,modifier=Modifier.weight(1f),color=Navy,fontWeight=FontWeight.SemiBold)
+                            Glyph("chevron",Muted,Modifier.size(18.dp))
+                        }
+                        HorizontalDivider(color=Border)
+                    }
+                }
+            }
+        }
+    },confirmButton={TextButton(onDismiss){Text("Abbrechen")}})
 }

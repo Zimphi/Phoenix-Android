@@ -13,6 +13,9 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
 - Settings contains Legal, Privacy, licenses, IFD pairing and a disabled planned cloud entry.
 - eID simulation offers NFC and IFD icon selectors below the phone illustration.
   Switching transport preserves the layout; pairing belongs in Settings → IFD-Schnittstelle.
+- Simulation selects document type first, then a matching profile. Profile selection
+  is locked while running. The editor's play icon saves valid edits and opens
+  Simulation with that profile; starting remains an explicit action there.
 - NFC APDUs execute locally through the unchanged core implementation; no
   substitute protocol engine and no cloud fallback.
 - Android, local and Vercel must use the same source revisions. Target binaries differ.

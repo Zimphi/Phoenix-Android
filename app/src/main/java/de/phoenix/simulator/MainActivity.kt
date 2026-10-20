@@ -52,6 +52,7 @@ class MainActivity:ComponentActivity() {
     var remoteState by remember{mutableStateOf(JSONObject())}
     var pairBusy by remember{mutableStateOf(false)}
     var forgetPairing by remember{mutableStateOf(false)}
+    var simulationPicker by remember{mutableStateOf(false)}
     val coreReady=remember{CompletableDeferred<Unit>()}
     LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(page!="IFD-Schnittstelle")withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"))}};remoteState=JSONObject();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
     LaunchedEffect(Unit) {
@@ -134,11 +135,17 @@ class MainActivity:ComponentActivity() {
             pairBusy=false
         }
     }
+    fun saveProfile(profile:Profile,name:String,settings:JSONObject):Boolean {
+        val value=name.trim()
+        if(value.isEmpty()||value.length>120){message="Profilname muss 1 bis 120 Zeichen enthalten";return false}
+        val old=profile.name;val previous=profile.settings;profile.name=value;profile.settings=settings
+        return runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++;Toast.makeText(context,"Profilentwurf gespeichert",Toast.LENGTH_SHORT).show()}.onFailure{profile.name=old;profile.settings=previous;message=it.message}.isSuccess
+    }
     val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
     Column(Modifier.fillMaxSize().background(Page).statusBarsPadding().semantics{testTagsAsResourceId=true}) {
-        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(if(page=="Profile")96.dp else 56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
             if(page=="Profile"||page=="Simulation") {
-                Brand(Modifier.size(34.dp,42.dp));Spacer(Modifier.width(8.dp));Text("Phoenix",fontSize=20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
+                Brand(Modifier.size(if(page=="Profile")72.dp else 34.dp,if(page=="Profile")86.dp else 42.dp));Spacer(Modifier.width(12.dp));Text("Phoenix",fontSize=if(page=="Profile")30.sp else 20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
             }else{
                 if(page in listOf("Editor","Einstellungen","Profilliste","IFD-Schnittstelle"))IconButton({page=when(page){"Editor"->"Profilliste";"Profilliste"->"Profile";"IFD-Schnittstelle"->"Einstellungen";else->"Über"}},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
                 if(page=="Editor"||page=="Profilliste") {Spacer(Modifier.weight(1f));Brand(Modifier.size(30.dp,38.dp))}
@@ -152,13 +159,9 @@ class MainActivity:ComponentActivity() {
                 when(page) {
                     "Profile"->ProfileList(visibleProfiles,{selectedKind=it;selected=null;page="Profilliste"},{creating=true})
                     "Profilliste"->ProfileSelection(visibleProfiles,selectedKind,{selected=it;page="Editor"},{createProfile(selectedKind)})
-                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{name,settings->
-                        val value=name.trim()
-                        if(value.isEmpty()||value.length>120)message="Profilname muss 1 bis 120 Zeichen enthalten"
-                        else {val old=profile.name;val previous=profile.settings;profile.name=value;profile.settings=settings;runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;Toast.makeText(context,"Profilentwurf gespeichert",Toast.LENGTH_SHORT).show()}.onFailure{profile.name=old;profile.settings=previous;message=it.message}}
-                    },{
+                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{name,settings->saveProfile(profile,name,settings)},{
                         runCatching{val draft=profile.json().put("id","eid-copy-"+java.util.UUID.randomUUID().toString()).put("name",profile.name+" · Kopie");store.importDraft(draft.toString())}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
-                    },{group->if(profile.signedFixture)message="Signiertes PersoSim-Testprofil: Datengruppen sind unveränderlich. Eigene Daten bitte in einem separaten Profil bearbeiten." else editing=group})}
+                    },{group->if(profile.signedFixture)message="Signiertes PersoSim-Testprofil: Datengruppen sind unveränderlich. Eigene Daten bitte in einem separaten Profil bearbeiten." else editing=group},{if(profile.kind=="epassport")wlan=false;page="Simulation"})}
                     "Über"->About(components){clipboard.setText(androidx.compose.ui.text.AnnotatedString("Phoenix Android ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n$components"));Toast.makeText(context,"Versionsinfos kopiert",Toast.LENGTH_SHORT).show()}
                     "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"})
                     "IFD-Schnittstelle"->ReaderSettings(remoteState,pairBusy,::pairReader,{
@@ -170,11 +173,15 @@ class MainActivity:ComponentActivity() {
                             withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"));NativeCore.call(JSONObject().put("op","close"))}}
                             remoteState=JSONObject();status="Simulation beendet"
                         }
-                    },wlan,{wlan=it},remoteState)
+                    },wlan,{wlan=it},remoteState,{simulationPicker=true})
                 }
             }
         }
         Navigation(active){page=it}
+    }
+    if(simulationPicker)SimulationProfilePicker(store?.profiles?:emptyList(),{simulationPicker=false}){profile->
+        selected=profile;selectedKind=profile.kind;if(profile.kind=="epassport")wlan=false
+        status="Simulation nicht aktiv";simulationPicker=false
     }
     if(forgetPairing)AlertDialog(onDismissRequest={forgetPairing=false},title={Text("Kopplungen entfernen?")},text={Text("Die AusweisApp muss anschließend erneut gekoppelt werden.")},confirmButton={TextButton({
         forgetPairing=false;scope.launch{withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_forget"))}.onFailure{message=it.message}};remoteState=JSONObject()}
