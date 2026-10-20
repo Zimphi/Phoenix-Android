@@ -8,6 +8,9 @@ use std::{fs, io::Write, path::Path, sync::{Mutex, OnceLock}};
 use zeroize::Zeroizing;
 
 mod activation;
+mod remote;
+mod remote_identity;
+static READER: Mutex<Option<remote::Reader>> = Mutex::new(None);
 mod provision;
 static ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
 static RUNTIME: OnceLock<Mutex<(Native,Option<phoenix_eid_core::application::Application>)>> = OnceLock::new();
@@ -15,6 +18,11 @@ static RUNTIME: OnceLock<Mutex<(Native,Option<phoenix_eid_core::application::App
 #[serde(tag="op", rename_all="snake_case", deny_unknown_fields)]
 enum Request {
     Inventory,
+    IfdStart {draft:Value, pair:bool},
+    IfdPair,
+    IfdForget,
+    IfdStatus,
+    IfdStop,
     TrialPrepare,
     TrialReceive {delivery:Value},
     Mount {kind:String, id:String},
@@ -28,9 +36,39 @@ enum Request {
 fn dispatch(request: &str) -> Result<Value> {
     ensure!(request.len() <= 32*1024*1024,"Request size limit");
     let request:Request=serde_json::from_str(request)?;
+    if matches!(request,Request::IfdStatus|Request::IfdStop|Request::IfdForget) {
+        let mut reader=READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?;
+        return match request {
+            Request::IfdStatus=>reader.as_ref().map(|r|r.status()).unwrap_or_else(||Ok(json!({"running":false,"paired":ROOT.get().map(|root|remote::stored_peers(root)).transpose()?.unwrap_or(0)}))),
+            _=>{if let Some(mut reader)=reader.take(){reader.stop()?;}if matches!(request,Request::IfdForget){remote::forget_peers(ROOT.get().context("App root missing")?)?;}Ok(json!({"running":false}))}
+        };
+    }
+    if !matches!(request,Request::IfdStart{..}|Request::IfdPair|Request::Inventory|Request::TrialPrepare|Request::TrialReceive{..}) {
+        ensure!(READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?.is_none(),"Zuerst den WLAN-Kartenleser beenden");
+    }
     let mut native=RUNTIME.get().context("Native Laufzeit nicht initialisiert")?.lock().map_err(|_|anyhow::anyhow!("Core-Zustand nicht verfügbar"))?;
     let (native,application)=&mut *native;
     match request {
+        Request::IfdStatus|Request::IfdStop|Request::IfdForget=>unreachable!(),
+        Request::IfdPair=>{
+            let root=ROOT.get().context("App root missing")?;
+            let mut reader=READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?;
+            if let Some(mut previous)=reader.take(){previous.stop()?;}
+            *application=None;native.close();
+            let next=remote::Reader::start(root,None,true)?;
+            let status=next.status()?;*reader=Some(next);Ok(status)
+        },
+        Request::IfdStart{draft,pair}=>{
+            ensure!(draft["kind"]=="eid","Remote IFD unterstützt eID-Profile");
+            let root=ROOT.get().context("App root missing")?;
+            let mut reader=READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?;
+            if let Some(mut previous)=reader.take(){previous.stop()?;}
+            let mounted=provision::mount(native,root,draft,application)?;
+            let id=mounted["profile"].as_str().context("Mounted profile missing")?;
+            *application=None;native.close();
+            let next=remote::Reader::start(root,Some(remote::load_card(root,id)?),pair)?;
+            let status=next.status()?;*reader=Some(next);Ok(status)
+        },
         Request::TrialPrepare => activation::prepare(ROOT.get().context("App root missing")?),
         Request::TrialReceive {delivery} => activation::receive(ROOT.get().context("App root missing")?,delivery),
         Request::Inventory => Ok(json!({"eid":native.inventory()?,"epassport":native.passport_inventory()?})),
