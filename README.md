@@ -7,8 +7,8 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
 
 ## Contract
 
-- Document type with profile counts → filtered profile list → editor → settings/data
-  groups; import belongs in the editor. Every listed profile shows its document type.
+- Document type with profile counts → filtered profile list → editor → data
+  groups/settings; import belongs in the editor. Every listed profile shows its document type.
 - About displays actual app/build and bundled core version/commit identifiers.
 - Settings contains Legal, Privacy, licenses and a disabled planned cloud entry.
 - NFC APDUs execute locally through the unchanged core implementation; no
@@ -17,6 +17,11 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
   `components.lock.json` records the Android revisions. Existing local/Vercel drift
   still needs reconciliation; this development build does not establish parity.
 - Cores remain private build inputs. No secrets, personal profiles or binaries in Git.
+
+The app includes 16 signed PersoSim fixtures (01–11 and UB01–UB05), without
+GlobalTester. Signed data stays immutable; editable copies use the local test PKI.
+The editor lists all supported eID DGs directly and exposes CAN, PIN, PUK and
+initial remaining counters. Transport-PIN is reserved pending shared core support.
 
 ## Build
 

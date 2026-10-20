@@ -5,9 +5,9 @@ Original application code: Apache-2.0; see LICENSE.
 Phoenix core source and binaries are NOT covered by this license.
 See THIRD_PARTY_NOTICES.md for separately licensed assets and components.
 
-PersoSim Profile03 synthetic test data: PersoSim project / Governikus GmbH,
+PersoSim Profile01–11 and ProfileUB01–05 synthetic test data: PersoSim project / Governikus GmbH,
 https://github.com/PersoSim/de.persosim.simulator
 revision 2b04578928ae5a1b40189dabe87c4939cb69bdf1, GPL-3.0.
-The derived persosim03-draft.json retains those terms (see licenses/GPL-3.0.txt).
+The derived persosim-profiles.json retains those terms (see licenses/GPL-3.0.txt).
 Signed security files and test CA keys stay in private local build inputs.
 The Apache-2.0 license for original application code remains unchanged.

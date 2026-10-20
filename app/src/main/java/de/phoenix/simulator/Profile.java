@@ -9,6 +9,7 @@ final class Profile {
     final String id;
     final String kind;
     String name;
+    boolean signedFixture;
     JSONObject groups;
     JSONObject settings;
     Profile(String id, String kind, String name, JSONObject groups) {
@@ -30,7 +31,9 @@ final class Profile {
         if(value.has("settings")) {
             JSONObject settings=value.getJSONObject("settings");
             if(!settings.getString("can").matches("[0-9]{6}") || !settings.getString("pin").matches("[0-9]{6}") || !settings.getString("puk").matches("[0-9]{10}")) throw new JSONException("Ungültige Test-Zugangsdaten");
-            profile.settings=new JSONObject().put("can",settings.getString("can")).put("pin",settings.getString("pin")).put("puk",settings.getString("puk"));
+            int pinRetries=settings.optInt("pin_retries",3),pukUses=settings.optInt("puk_uses",10);
+            if(pinRetries<0 || pinRetries>3 || pukUses<0 || pukUses>10) throw new JSONException("PIN-Versuche: 0–3; PUK-Nutzungen: 0–10");
+            profile.settings=new JSONObject().put("can",settings.getString("can")).put("pin",settings.getString("pin")).put("puk",settings.getString("puk")).put("pin_retries",pinRetries).put("puk_uses",pukUses).put("transport_pin",settings.optBoolean("transport_pin",false));
         }
         return profile;
     }

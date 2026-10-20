@@ -21,6 +21,20 @@ class RepositoryContract(unittest.TestCase):
             self.assertRegex(components[name]['commit'],r'^[0-9a-f]{40}$')
             self.assertTrue(components[name]['version'])
 
+    def test_persosim_catalog_has_all_requested_profiles_without_globaltester(self):
+        manifest=json.loads((ROOT/'persosim-fixtures.lock.json').read_text())
+        drafts=json.loads((ROOT/'app/src/main/assets/persosim-profiles.json').read_text())
+        expected={f'eid-persosim{number:02}' for number in range(1,12)} | {f'eid-persosimub{number:02}' for number in range(1,6)}
+        self.assertEqual({entry['id'] for entry in manifest['profiles']},expected)
+        self.assertEqual({draft['id'] for draft in drafts},expected)
+        self.assertEqual(len(drafts),16)
+        for draft in drafts:
+            self.assertEqual(draft['kind'],'eid')
+            self.assertTrue(draft['groups'])
+        for entry in manifest['profiles']:
+            self.assertRegex(entry['source_sha256'],r'^[0-9a-f]{64}$')
+            self.assertRegex(entry['adapted_sha256'],r'^[0-9a-f]{64}$')
+
     def test_hce_only_registers_test_document_aids_and_requires_unlock(self):
         root=ET.parse(ROOT/'app/src/main/res/xml/apdu_service.xml').getroot()
         namespace='{http://schemas.android.com/apk/res/android}'

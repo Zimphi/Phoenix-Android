@@ -1,0 +1,117 @@
+{
+  "commit": "2b04578928ae5a1b40189dabe87c4939cb69bdf1",
+  "profiles": [
+    {
+      "file": "Profile01.perso",
+      "id": "eid-persosim01",
+      "name": "PersoSim 01 Testausweis",
+      "source_sha256": "fa866bc90d58eedb2d86e59ef5017d142e98eb4e0c997aca456fc2a73a188091",
+      "adapted_sha256": "578a6b878ffaade33982559cc6de888e683a29751dae6ecc9e90441eb3e68dbb"
+    },
+    {
+      "file": "Profile02.perso",
+      "id": "eid-persosim02",
+      "name": "PersoSim 02 Testausweis",
+      "source_sha256": "938d9ed3d0c2d4503c05d79d5412f560b65b3db2f2e6b8cc98ae6e7995db6d43",
+      "adapted_sha256": "5232f318b26c13acc747e57936d2098752ddef2c8b77914bd9a826040413b74e"
+    },
+    {
+      "file": "Profile03.perso",
+      "id": "eid-persosim03",
+      "name": "PersoSim 03 Testausweis",
+      "source_sha256": "17d430207a03953f6061d9902c860e77dfa71d8bf48324ed54c99a9c6a747155",
+      "adapted_sha256": "b915bdfe2c322c0fb9168933d8035d1137c08616ae7ad31f583d5a5df7e33764"
+    },
+    {
+      "file": "Profile04.perso",
+      "id": "eid-persosim04",
+      "name": "PersoSim 04 Testausweis",
+      "source_sha256": "9a2c24a15a3e261b793d826d932f42823676ceecacdc6ae90f4bf9e9b26cf40f",
+      "adapted_sha256": "42ad6c98ab894d608f73d5b3913651e3441035756706c400352bb6f2bc04bc1d"
+    },
+    {
+      "file": "Profile05.perso",
+      "id": "eid-persosim05",
+      "name": "PersoSim 05 Testausweis",
+      "source_sha256": "9e683d2bcbc47bcdd979daa5b882eaa71f291bc96f51db29eac8b36a7ef5f2dd",
+      "adapted_sha256": "846e46fcde9f5c10a5ecf3661ae3e86705b7415035caea3b2f77ae967f7e876a"
+    },
+    {
+      "file": "Profile06.perso",
+      "id": "eid-persosim06",
+      "name": "PersoSim 06 Testausweis",
+      "source_sha256": "8953164310b4c3cf7c841235e8779e8b2ff7ad98b3c5326c4a3551804b5bea19",
+      "adapted_sha256": "29d1e806e0bb06c5253432da7a88a5e07b6ba5cbf6b1c684cf5b5de47ffe72f9"
+    },
+    {
+      "file": "Profile07.perso",
+      "id": "eid-persosim07",
+      "name": "PersoSim 07 Testausweis",
+      "source_sha256": "9d85ccd40a15a8207db51aee85100327495f994d4b08249e587a960039294206",
+      "adapted_sha256": "0a59c54217159f019728de69aa090e3ff7161104bbd464acfa5cba260bdb0885"
+    },
+    {
+      "file": "Profile08.perso",
+      "id": "eid-persosim08",
+      "name": "PersoSim 08 Testausweis",
+      "source_sha256": "a3eb2f64fc071b46b0124e205474c8f9136c6232f0dbb19741aebb1cea7687ca",
+      "adapted_sha256": "4f6f7587f3ddc89dc26dfa938c1683b8d7b066522ad393f202f039c2cb7ae53c"
+    },
+    {
+      "file": "Profile09.perso",
+      "id": "eid-persosim09",
+      "name": "PersoSim 09 Testausweis",
+      "source_sha256": "7b65afee95cbf1b68a1020478a008d1e4a5ac9157b08c810035aab5e184aaa0d",
+      "adapted_sha256": "ae396497d766e725d6f669cb592c3cc727142e1c5c23ec1964161a3b6e914792"
+    },
+    {
+      "file": "Profile10.perso",
+      "id": "eid-persosim10",
+      "name": "PersoSim 10 Testausweis",
+      "source_sha256": "0a68e67091a7d9d4a75a47274580696e3982cffe1a624a7cb28a817751f9e771",
+      "adapted_sha256": "8321b48e2e68b107dafb3447d0b3ef7d322515bab04af1ad1ad7bf90b640d19c"
+    },
+    {
+      "file": "Profile11.perso",
+      "id": "eid-persosim11",
+      "name": "PersoSim 11 Testausweis",
+      "source_sha256": "16d1c7dd8bfb79676742b34d23b4cdb5e0b385e836eb5cd2258aa470efa413ee",
+      "adapted_sha256": "5fce6c27ef3548a1d9408d69067e17bd696341428023bcf5c1ce64ff650fc144"
+    },
+    {
+      "file": "ProfileUB01.perso",
+      "id": "eid-persosimub01",
+      "name": "PersoSim UB01 Testausweis",
+      "source_sha256": "232c11638f65c173cf11273693fa9b560a5898404a315efd232fdeb3fc342f69",
+      "adapted_sha256": "982c62fa72c03c936249c41217be4be37fc1079589a52cc0fd2e67258fd39e92"
+    },
+    {
+      "file": "ProfileUB02.perso",
+      "id": "eid-persosimub02",
+      "name": "PersoSim UB02 Testausweis",
+      "source_sha256": "87b237d85726a9a3ceb103f33abf719aa00d65a215591f48b3f32e5912a5cd55",
+      "adapted_sha256": "43f63e8d1054fdb6eec7f6fb0a8867bc1e9a3b88ce13ab6c4fa2b414470b387f"
+    },
+    {
+      "file": "ProfileUB03.perso",
+      "id": "eid-persosimub03",
+      "name": "PersoSim UB03 Testausweis",
+      "source_sha256": "c874246eea4be0b6f8324d504ed483c1085f2f7b1ec35054a64a310b87c20d63",
+      "adapted_sha256": "110afcf57e6d835ebdc19d64c7d660f67575f26f53610d33a5a11645eb6efd5c"
+    },
+    {
+      "file": "ProfileUB04.perso",
+      "id": "eid-persosimub04",
+      "name": "PersoSim UB04 Testausweis",
+      "source_sha256": "c3a28e816c10c433a3417950187d6d36bf0b86b04605b8471a3e225627376125",
+      "adapted_sha256": "0d101a890f94b01f5ecbe6c42166c1fee18ba880fc43a47b9b3064c884e7ee55"
+    },
+    {
+      "file": "ProfileUB05.perso",
+      "id": "eid-persosimub05",
+      "name": "PersoSim UB05 Testausweis",
+      "source_sha256": "ce80eaeaa3a1ba1b5a9bc042c4121a04844283637c43d665cc9803616d381e71",
+      "adapted_sha256": "ea60192c8ee79113b493a04dfcca4d51ebbddd8389b0bd1faa2799d36d284433"
+    }
+  ]
+}

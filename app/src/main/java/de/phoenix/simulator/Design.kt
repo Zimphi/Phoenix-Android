@@ -85,10 +85,10 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
                 val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                     setColor(gold.toArgb());textAlign=android.graphics.Paint.Align.CENTER
                     typeface=android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL)
-                    textSize=8f
+                    textSize=10f
                 }
-                drawContext.canvas.nativeCanvas.drawText("TEST",95f,42f,paint)
-                paint.textSize=6.7f
+                drawContext.canvas.nativeCanvas.drawText("UTOPIA",95f,42f,paint)
+                paint.textSize=10f
                 drawContext.canvas.nativeCanvas.drawText("REISEPASS",95f,115f,paint)
                 drawLine(gold.copy(alpha=.6f),Offset(82f,125f),Offset(108f,125f),.7f)
             }

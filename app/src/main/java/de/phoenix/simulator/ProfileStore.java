@@ -17,12 +17,13 @@ final class ProfileStore {
             try(InputStream input=file.openRead()) { list=new JSONArray(read(input)); }
         } else list=Profile.defaults();
         for(int i=0;i<list.length();i++) profiles.add(Profile.parse(list.getJSONObject(i)));
-        boolean present=false;
-        for(Profile profile:profiles) if(profile.id.equals("eid-persosim03")) present=true;
-        if(!present && profiles.size()<100) {
-            try(InputStream input=context.getAssets().open("persosim03-draft.json")) {
-                importDraft(read(input));
-            }
+        JSONArray catalog;
+        try(InputStream input=context.getAssets().open("persosim-profiles.json")) { catalog=new JSONArray(read(input)); }
+        for(int i=0;i<catalog.length();i++) {
+            JSONObject draft=catalog.getJSONObject(i);
+            boolean present=false;
+            for(Profile profile:profiles) if(profile.id.equals(draft.getString("id"))) { profile.signedFixture=true; present=true; }
+            if(!present && profiles.size()<100) importDraft(draft.toString()).signedFixture=true;
         }
     }
     static String read(InputStream input) throws IOException {

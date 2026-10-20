@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.semantics.*
 import org.json.JSONObject
 
 @Composable internal fun ProfileList(profiles:List<Profile>,onSelect:(String)->Unit,onCreate:()->Unit) {
@@ -58,7 +59,7 @@ import org.json.JSONObject
                     Box(Modifier.size(52.dp).background(if(kind=="eid")Color(0xffe9efdf)else Color(0xffe5eaff),RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center){if(kind=="epassport")Art(kind,Modifier.size(46.dp).offset(x=(-4).dp))else Glyph(kind,Color(0xff4c6631),Modifier.size(27.dp))}
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                         Text(profile.name,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(if(profile.id=="eid-persosim03")"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
+                        Text(if(profile.signedFixture)"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
                     }
                     Glyph("chevron",Muted,Modifier.size(20.dp))
                 }
@@ -130,38 +131,60 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSaveName:(String)->Unit,onEditGroup:(String)->Unit) {
-    var groups by remember(profile.id){mutableStateOf(false)}
+@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSave:(String,JSONObject)->Unit,onCopy:()->Unit,onEditGroup:(String)->Unit) {
+    var groups by remember(profile.id){mutableStateOf(true)}
     var name by remember(profile.id){mutableStateOf(profile.name)}
+    var can by remember(profile.id){mutableStateOf(profile.settings.getString("can"))}
+    var pin by remember(profile.id){mutableStateOf(profile.settings.getString("pin"))}
+    var puk by remember(profile.id){mutableStateOf(profile.settings.getString("puk"))}
+    var retries by remember(profile.id){mutableStateOf(profile.settings.optInt("pin_retries",3).toString())}
+    var uses by remember(profile.id){mutableStateOf(profile.settings.optInt("puk_uses",10).toString())}
+    var transport by remember(profile.id){mutableStateOf(profile.settings.optBoolean("transport_pin",false))}
+    val valid=can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex("[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
         Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {
             Text(profile.name,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy)
-            Text(if(profile.id=="eid-persosim03")"eID · Signiertes PersoSim-Profil" else "${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
+            Text(if(profile.signedFixture)"eID · Signiertes PersoSim-Profil" else "${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
         }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Pale).padding(3.dp)) {
-            listOf("Einstellungen","Datengruppen").forEachIndexed { index,label ->
-                val active=groups==(index==1)
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if(active)Blue else Color.Transparent).clickable{groups=index==1}.padding(vertical=12.dp),contentAlignment=Alignment.Center) {Text(label,fontSize=12.sp,color=if(active)Color.White else Muted)}
+            listOf("Datengruppen","Einstellungen").forEachIndexed { index,label ->
+                val active=groups==(index==0)
+                Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if(active)Blue else Color.Transparent).clickable{groups=index==0}.padding(vertical=12.dp),contentAlignment=Alignment.Center) {Text(label,fontSize=12.sp,color=if(active)Color.White else Muted)}
             }
         }
-        Action("Profil importieren",false,onClick=onImport)
+        if(groups)Action("Profil importieren",false,onClick=onImport)
+        if(groups&&profile.signedFixture)Action("Bearbeitbare Kopie erstellen",false,onClick=onCopy)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(groups) {
-                profile.groups.keys().asSequence().sortedBy{it.removePrefix("DG").toInt()}.forEach { key ->
+                (if(profile.kind=="eid")(1..22).filter{it!=16}.map{"DG$it"} else profile.groups.keys().asSequence().sortedBy{it.removePrefix("DG").toInt()}.toList()).forEach { key ->
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if(key=="DG1")Pale else Color.White).border(1.dp,Border,RoundedCornerShape(10.dp)).clickable{onEditGroup(key)}.padding(horizontal=15.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically) {
-                        val description=when(key){"DG1"->if(profile.kind=="epassport")"Personendaten & MRZ" else "Dokumenttyp";"DG2"->if(profile.kind=="epassport")"Gesichtsbild" else "Ausstellender Staat";"DG4"->"Vornamen";"DG5"->"Familienname";"DG8"->"Geburtsdatum";"DG14"->"Sicherheitsinformationen";else->"Inhalt bearbeiten"}
+                        val description=if(profile.kind=="eid")listOf("Dokumenttyp","Ausstellender Staat","Ablaufdatum","Vornamen","Familienname","Ordens-/Künstlername","Doktorgrad","Geburtsdatum","Geburtsort","Staatsangehörigkeit","Geschlecht","Optionale Daten","Geburtsname","Unterschriftsbild (JPEG 2000)","Ausstellungsdatum","Reserviert","Anschrift","Gemeindeschlüssel","Aufenthaltstitel I","Aufenthaltstitel II","Telefonnummer","E-Mail-Adresse")[key.removePrefix("DG").toInt()-1] else when(key){"DG1"->if(profile.kind=="epassport")"Personendaten & MRZ" else "Dokumenttyp";"DG2"->if(profile.kind=="epassport")"Gesichtsbild" else "Ausstellender Staat";"DG4"->"Vornamen";"DG5"->"Familienname";"DG8"->"Geburtsdatum";"DG14"->"Sicherheitsinformationen";else->"Inhalt bearbeiten"}
                         Column(Modifier.weight(1f)) {Text(key,fontSize=14.sp,fontWeight=FontWeight.SemiBold,color=Navy);Text(description,fontSize=11.sp,color=Muted)}
                         Glyph("edit",Blue,Modifier.size(17.dp));Spacer(Modifier.width(14.dp));Glyph("chevron",Muted,Modifier.size(18.dp))
                     }
                 }
-                Action("Datengruppe hinzufügen",false,onClick={onEditGroup("")})
             } else {
                 OutlinedTextField(name,{name=it.take(120)},label={Text("Profilname")},singleLine=true,modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp))
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Pale).padding(16.dp)) {Text("Dokumenttyp",fontSize=13.sp,color=Muted,modifier=Modifier.weight(1f));Text(profile.label(),fontSize=14.sp,color=Navy)}
-                Text("Synthetische Daten · lokal gespeichert",fontSize=11.sp,color=Muted)
+                Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                    listOf(Triple("CAN",can,{v:String->can=v}),Triple("PIN",pin,{v:String->pin=v})).forEach { (label,value,change) ->
+                        OutlinedTextField(value,{change(it.filter(Char::isDigit).take(6))},label={Text(label)},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription=label},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
+                    }
+                }
+                OutlinedTextField(puk,{puk=it.filter(Char::isDigit).take(10)},label={Text("PUK")},singleLine=true,modifier=Modifier.fillMaxWidth().semantics{contentDescription="PUK"},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
+                if(profile.kind=="eid") {
+                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(retries,{retries=it.filter(Char::isDigit).take(1)},label={Text("PIN-Versuche (0–3)")},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription="PIN-Versuche (0–3)"},keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
+                        OutlinedTextField(uses,{uses=it.filter(Char::isDigit).take(2)},label={Text("PUK-Nutzungen (0–10)")},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription="PUK-Nutzungen (0–10)"},keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
+                    }
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Text("Transport-PIN-Modus",fontSize=14.sp,color=Navy,modifier=Modifier.weight(1f))
+                        Switch(transport,{transport=it},enabled=false,modifier=Modifier.semantics{contentDescription="Transport-PIN-Modus"})
+                    }
+                    Text("Verbleibende Versuche / Nutzungen beim Start mit diesen Einstellungen. Transport-PIN ist vorgemerkt; der gemeinsame Core unterstützt sie noch nicht.",fontSize=11.sp,color=Muted)
+                }
             }
         }
-        if(!groups)Action("Änderungen speichern",onClick={onSaveName(name)})
+        if(!groups)Action("Änderungen speichern",enabled=valid,onClick={onSave(name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport))})
     }
 }
 
@@ -172,10 +195,9 @@ import org.json.JSONObject
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val artHeight=(maxHeight-470.dp).coerceIn(96.dp,160.dp)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(Space),horizontalAlignment=Alignment.CenterHorizontally) {
-        Text("NFC-Simulation",fontSize=27.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.8).sp,color=Navy,modifier=Modifier.fillMaxWidth())
+        Text("Simulation",fontSize=27.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.8).sp,color=Navy,modifier=Modifier.fillMaxWidth())
         Art("nfc",Modifier.fillMaxWidth().height(artHeight))
         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Text(if(active)"Bereit zum Verbinden" else "Bereit zum Starten",fontSize=23.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.6).sp,color=Navy,textAlign=TextAlign.Center)
             Text("Smartphone an das Lesegerät halten",fontSize=12.sp,color=Muted,textAlign=TextAlign.Center)
         }
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -193,7 +215,6 @@ import org.json.JSONObject
             }
         }
         if(active)Action("Simulation beenden",false,onClick=onStop) else Action(if(starting)"Wird gestartet …" else if(stopping)"Wird beendet …" else "Simulation starten",enabled=!starting&&!stopping,onClick=onStart)
-        Text("NFC-Kompatibilität geräteabhängig",fontSize=10.sp,color=Muted)
     }
     }
 }

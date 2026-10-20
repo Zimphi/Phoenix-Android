@@ -47,7 +47,6 @@ class MainActivity:ComponentActivity() {
     var legal by remember{mutableStateOf<String?>(null)}
     var creating by remember{mutableStateOf(false)}
     var editing by remember{mutableStateOf<String?>(null)}
-    var choosingGroup by remember{mutableStateOf(false)}
     var status by remember{mutableStateOf("Simulation nicht aktiv")}
     val coreReady=remember{CompletableDeferred<Unit>()}
     LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
@@ -124,11 +123,13 @@ class MainActivity:ComponentActivity() {
                 when(page) {
                     "Profile"->ProfileList(visibleProfiles,{selectedKind=it;selected=null;page="Profilliste"},{creating=true})
                     "Profilliste"->ProfileSelection(visibleProfiles,selectedKind,{selected=it;page="Editor"},{createProfile(selectedKind)})
-                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{name->
+                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{name,settings->
                         val value=name.trim()
                         if(value.isEmpty()||value.length>120)message="Profilname muss 1 bis 120 Zeichen enthalten"
-                        else {val old=profile.name;profile.name=value;runCatching{store.save()}.onSuccess{revision++;Toast.makeText(context,"Profilentwurf gespeichert",Toast.LENGTH_SHORT).show()}.onFailure{profile.name=old;message=it.message}}
-                    },{group->if(profile.id=="eid-persosim03")message="Signiertes PersoSim-Testprofil: Datengruppen sind unveränderlich. Eigene Daten bitte in einem separaten Profil bearbeiten." else if(group.isEmpty())choosingGroup=true else editing=group})}
+                        else {val old=profile.name;val previous=profile.settings;profile.name=value;profile.settings=settings;runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;Toast.makeText(context,"Profilentwurf gespeichert",Toast.LENGTH_SHORT).show()}.onFailure{profile.name=old;profile.settings=previous;message=it.message}}
+                    },{
+                        runCatching{val draft=profile.json().put("id","eid-copy-"+java.util.UUID.randomUUID().toString()).put("name",profile.name+" · Kopie");store.importDraft(draft.toString())}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
+                    },{group->if(profile.signedFixture)message="Signiertes PersoSim-Testprofil: Datengruppen sind unveränderlich. Eigene Daten bitte in einem separaten Profil bearbeiten." else editing=group})}
                     "Über"->About(components){clipboard.setText(androidx.compose.ui.text.AnnotatedString("Phoenix Android ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n$components"));Toast.makeText(context,"Versionsinfos kopiert",Toast.LENGTH_SHORT).show()}
                     "Einstellungen"->Settings{legal=it}
                     "Simulation"->Simulation(selected,status,::startSimulation,{
@@ -147,9 +148,6 @@ class MainActivity:ComponentActivity() {
     if(creating)AlertDialog(onDismissRequest={creating=false},title={Text("Neues Testprofil")},text={Column{
         listOf("epassport" to "ePassport","eid" to "eID").forEach{(kind,label)->Action(label,false){createProfile(kind)}}
     }},confirmButton={},dismissButton={TextButton({creating=false}){Text("Abbrechen")}})
-    if(choosingGroup)AlertDialog(onDismissRequest={choosingGroup=false},title={Text("Datengruppe auswählen")},text={Column(Modifier.heightIn(max=350.dp).verticalScroll(rememberScrollState())){
-        (1..if(selected?.kind=="eid")22 else 16).forEach{n->TextButton({editing="DG$n";choosingGroup=false},Modifier.fillMaxWidth()){Text("DG$n")}}
-    }},confirmButton={TextButton({choosingGroup=false}){Text("Abbrechen")}})
     editing?.let{group->
         var value by remember(group){mutableStateOf(selected!!.groups.optString(group,""))}
         AlertDialog(onDismissRequest={editing=null},title={Text("$group bearbeiten")},text={OutlinedTextField(value,{value=it.take(65536)},modifier=Modifier.fillMaxWidth().heightIn(min=120.dp,max=260.dp),label={Text("$group Inhalt")})},confirmButton={TextButton({

@@ -16,3 +16,8 @@ GPL/LGPL dependencies and the simulator host's licensing. No public APK is suppl
 Lucide icons are under ISC / MIT terms, with the full notice in `licenses/Lucide.txt`.
 Source revision and vector conversion are recorded in `licenses/Lucide-source.txt`.
 Manrope font is under SIL Open Font License 1.1; see `licenses/Manrope.txt`.
+
+PersoSim Profile01–11 and ProfileUB01–05: synthetic test data from
+https://github.com/PersoSim/de.persosim.simulator at
+2b04578928ae5a1b40189dabe87c4939cb69bdf1, GPL-3.0.
+See licenses/GPL-3.0.txt. GlobalTester is excluded.

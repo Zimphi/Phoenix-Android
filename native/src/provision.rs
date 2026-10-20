@@ -12,7 +12,17 @@ use zeroize::Zeroizing;
 struct Draft { format:String,id:String,kind:String,name:String,groups:BTreeMap<String,String>,settings:Settings }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Settings {can:String,pin:String,puk:String}
+struct Settings {can:String,pin:String,puk:String,
+    #[serde(default="pin_retries")] pin_retries:u8,
+    #[serde(default="puk_uses")] puk_uses:u8,
+    #[serde(default)] transport_pin:bool,
+}
+fn pin_retries()->u8{3}
+fn puk_uses()->u8{10}
+#[path="persosim_sources.rs"] mod persosim_sources;
+fn fixture(id:&str)->Option<(&'static str,&'static [u8])>{
+    persosim_sources::SOURCES.iter().find(|(key,_,_)|*key==id).map(|(_,file,bytes)|(*file,*bytes))
+}
 
 pub fn config(root:&Path)->Result<Config>{
     let secret=Zeroizing::new(std::fs::read(root.join("profile-passphrase"))?);
@@ -72,10 +82,9 @@ fn governikus_anchor()->Result<Anchor>{
     // Explicit public-key pin from the versioned test fixture, not an unverified issuer chain.
     Ok(Anchor{reference:certificate.holder().to_vec(),key:certificate.public_key().public_key_to_der()?,rights:certificate.rights(),oid:None,chat:certificate.chat_oid().into()})
 }
-fn persosim_source(root:&Path)->Result<std::path::PathBuf>{
-    let source=include_bytes!("../../.private/PersoSimProfile03.perso");
-    ensure!(phoenix_simulator::runtime::hex(&openssl::sha::sha256(source)).eq_ignore_ascii_case("b915bdfe2c322c0fb9168933d8035d1137c08616ae7ad31f583d5a5df7e33764"),"Unexpected PersoSim test data");
-    let path=root.join("test-fixtures/persosim-2b045789-v1/profiles/Profile03.perso");
+fn persosim_source(root:&Path,id:&str)->Result<std::path::PathBuf>{
+    let (file,source)=fixture(id).context("Unknown PersoSim fixture")?;
+    let path=root.join("test-fixtures/persosim-2b045789-v2/profiles").join(file);
     std::fs::create_dir_all(path.parent().unwrap())?;
     if !path.exists(){phoenix_eid_core::persistence::write_atomic(&path,source)?;}
     ensure!(std::fs::read(&path)?==source,"PersoSim test data changed");Ok(path)
@@ -83,43 +92,44 @@ fn persosim_source(root:&Path)->Result<std::path::PathBuf>{
 fn profile_id(kind:&str,bytes:&[u8])->String{
     let digest=openssl::sha::sha256(bytes);
     let suffix=digest[..8].iter().map(|v|format!("{v:02x}")).collect::<String>();
-    format!("{}{suffix}",if kind=="persosim"{"android_eid_ps03v1_"}else{"android_"})
+    format!("{}{suffix}",if kind=="persosim"{"android_persosim_v2_"}else{"android_"})
 }
 pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<phoenix_eid_core::application::Application>)->Result<Value>{
     let bytes=serde_json::to_vec(&value)?;ensure!(bytes.len()<=1024*1024,"Draft limit");
     let draft:Draft=serde_json::from_value(value)?;
     ensure!(draft.format=="phoenix-android-draft-v1"&&["eid","epassport"].contains(&draft.kind.as_str()),"Unsupported draft");
     pki_admin::identifier(&draft.id)?;
-    if draft.id=="eid-persosim03" {
-        let original:Draft=serde_json::from_str(include_str!("../../app/src/main/assets/persosim03-draft.json"))?;
+    ensure!(!draft.settings.transport_pin,"Transport-PIN benötigt Unterstützung im gemeinsamen Core; PIN-Deaktivierung ist kein Ersatz");
+    let signed=fixture(&draft.id);
+    if signed.is_some() {
+        let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json"))?;
+        let original=catalog.into_iter().find(|p|p.id==draft.id).context("Missing signed draft")?;
         ensure!(draft.kind=="eid"&&draft.groups==original.groups,"Signierte PersoSim-Datengruppen müssen unverändert bleiben; für eigene Daten ein separates Profil verwenden");
     }
-    let id=profile_id(if draft.id=="eid-persosim03"{"persosim"}else{&draft.kind},&bytes);pki_admin::identifier(&id)?;
+    let id=profile_id(if signed.is_some(){"persosim"}else{&draft.kind},&bytes);pki_admin::identifier(&id)?;
     *application=None;native.close();
     // Validate and encode before generating any local PKI or writing a profile.
     let eid=if draft.kind=="eid"{Some(eid_profile(&draft.groups)?)}else{None};
     let passport=if draft.kind=="epassport"{Some(passport_groups(&draft.groups)?)}else{None};
     pki(native,root)?;
     if let Some(profile)=eid {
-        if draft.id!="eid-persosim03" {
-            if !root.join("profiles/eid").join(&id).exists(){
-                native.manage_profile(serde_json::from_value(json!({"op":"create","id":id,"document":"android-document","signer":0,"terminal":"android-terminal","profile":profile,"credentials":{"pin":draft.settings.pin,"can":draft.settings.can,"puk":draft.settings.puk,"mrz":"<<<<<<<<<<<<<<<<<<<<<<<<","pin_retries":3}}))?)?;
-            }
-            return native.mount(&id);
-        }
-        let anchor=governikus_anchor()?;
         if !root.join("profiles/eid").join(&id).exists(){
             let config=config(root)?;
             let Authority::Document(document)=pki_admin::load(&config.data,"android-document",&config.passphrase)? else{anyhow::bail!("Document test authority required")};
             let signer=document.document_signers().first().context("Document signer required")?;
-            let credentials=CredentialState::new(draft.settings.pin.as_bytes(),draft.settings.can.as_bytes(),draft.settings.puk.as_bytes(),b"<<<<<<<<<<<<<<<<<<<<<<<<",3,10,true,true)?;
+            let terminal=pki_admin::load(&config.data,"android-terminal",&config.passphrase)?;
+            let Authority::Terminal(terminal)=terminal else{anyhow::bail!("Terminal test authority required")};
+            let anchor=if signed.is_some(){Some(governikus_anchor()?)}else{None};
+            let credentials=CredentialState::new(draft.settings.pin.as_bytes(),draft.settings.can.as_bytes(),draft.settings.puk.as_bytes(),b"<<<<<<<<<<<<<<<<<<<<<<<<",draft.settings.pin_retries,draft.settings.puk_uses,true,true)?;
             profile_creation::create(&config.profiles.join(&id),&config.passphrase,&profile,&credentials,
-                &CreationPki{csca:document.certificate(),signer,cvca:&anchor.key},
-                &CreationOptions{protocols:Default::default(),authenticated_pin_management:false,mobile_eid_type_info:None,time:chrono::Utc::now().timestamp(),card_date:None,cvca_lineage:vec![],cvca_is_lineage:vec![],cvca_public_key:None,cvca_anchor:Some(anchor.clone()),cvca_authorization:None})?;
+                &CreationPki{csca:document.certificate(),signer,cvca:anchor.as_ref().map(|a|a.key.as_slice()).unwrap_or(&terminal.root().certificate)},
+                &CreationOptions{protocols:Default::default(),authenticated_pin_management:false,mobile_eid_type_info:None,time:chrono::Utc::now().timestamp(),card_date:None,cvca_lineage:vec![],cvca_is_lineage:vec![],cvca_public_key:None,cvca_anchor:anchor.clone(),cvca_authorization:None})?;
         }
+        if signed.is_none(){return native.mount(&id);}
+        let label=format!("persosim:bsi-test:{}",signed.unwrap().0.trim_end_matches(".perso"));
         let config=config(root)?;
-        if phoenix_eid_core::profile_info::ProfilePkiInfo::load(&config.profiles.join(&id))?.document_pki_id!="persosim:bsi-test:Profile03" {
-            PersonalizedProfile::import_persosim(&config.profiles.join(&id),&persosim_source(root)?,&config.passphrase,&config.trusted_cscas,chrono::Utc::now().timestamp(),&[],Some("persosim:bsi-test:Profile03"),&[]).context("PersoSim profile import")?;
+        if phoenix_eid_core::profile_info::ProfilePkiInfo::load(&config.profiles.join(&id))?.document_pki_id!=label {
+            PersonalizedProfile::import_persosim(&config.profiles.join(&id),&persosim_source(root,&draft.id)?,&config.passphrase,&config.trusted_cscas,chrono::Utc::now().timestamp(),&[],Some(&label),&[]).context("PersoSim profile import")?;
         }
         // The existing PersoSim-aware loader validates the whole authentication unit before use.
         let profile=PersonalizedProfile::load(&config.profiles.join(&id),&config.passphrase,&config.trusted_cscas,chrono::Utc::now().timestamp(),&[])?;
@@ -136,16 +146,27 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
     use super::*;
     #[test] fn eid_uses_governikus_public_pin_and_invalidates_old_native_cache(){
         let anchor=governikus_anchor().unwrap();assert_eq!(anchor.reference,b"DETESTeID00009");assert!(anchor.oid.is_none());assert!(!anchor.key.is_empty());
-        let bytes=b"same draft";assert_ne!(profile_id("persosim",bytes),profile_id("epassport",bytes));assert!(profile_id("persosim",bytes).starts_with("android_eid_ps03v1_"));
+        let bytes=b"same draft";assert_ne!(profile_id("persosim",bytes),profile_id("epassport",bytes));assert!(profile_id("persosim",bytes).starts_with("android_persosim_v2_"));
     }
     #[test] fn fixture_preserves_signed_files_data_and_ca_keys(){
         let root=Path::new(env!("CARGO_MANIFEST_DIR")).join("../.private");
-        let original=phoenix_eid_core::persosim_profile::parse(&root.join("persosim/de.persosim.simulator/personalization/profiles/Profile03.perso")).unwrap();
-        let adapted=phoenix_eid_core::persosim_profile::parse(&root.join("PersoSimProfile03.perso")).unwrap();
+        assert_eq!(persosim_sources::SOURCES.len(),16);
+        assert!(fixture("eid-persosimgt").is_none());
+        let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json")).unwrap();
+        for (id,file,_) in persosim_sources::SOURCES {
+        let original=phoenix_eid_core::persosim_profile::parse(&root.join("persosim/de.persosim.simulator/personalization/profiles").join(file)).unwrap();
+        let adapted=phoenix_eid_core::persosim_profile::parse(&root.join("persosim-profiles").join(file)).unwrap();
+        let draft=catalog.iter().find(|draft|draft.id==*id).unwrap();
+        assert_eq!(draft.groups.len(),original.eid_files.len());
+        for (fid,raw) in &original.eid_files {
+            let number=(fid-0x100) as u8;
+            assert_eq!(draft.groups[&format!("DG{number}")],serde_json::to_string(&phoenix_eid_core::profile::decode(number,raw).unwrap()).unwrap());
+        }
         assert_eq!(original.card_access,adapted.card_access);assert_eq!(original.card_security,adapted.card_security);assert_eq!(original.chip_security,adapted.chip_security);assert_eq!(original.eid_files,adapted.eid_files);
         assert_eq!(original.ca_keys.len(),adapted.ca_keys.len());
         for (a,b) in original.ca_keys.iter().zip(&adapted.ca_keys){assert!(a.private_scalar==b.private_scalar);assert_eq!(a.public_point,b.public_point);assert_eq!(a.key_id,b.key_id);assert_eq!(a.parameter_id,b.parameter_id);assert_eq!(a.privileged,b.privileged);}
         assert!(adapted.cvca_certificate.is_none());assert!(adapted.approximate_date.is_none());
+        }
     }
     #[test] fn malformed_encoded_dg_and_mrz_fail_before_personalization(){assert!(passport_groups(&BTreeMap::from([("DG2".into(),"zz".into())])).is_err());assert!(passport_groups(&BTreeMap::from([("DG1".into(),"{}".into())])).is_err());}
     #[test] fn eid_values_use_the_original_core_validation(){assert!(eid_profile(&BTreeMap::from([("DG8".into(),"not-a-date".into())])).is_err());let profile=eid_profile(&BTreeMap::from([("DG4".into(),"MAX".into()),("DG5".into(),"MUSTERMANN".into())])).unwrap();assert_eq!(profile.values[&4],Group::Text("MAX".into()));}

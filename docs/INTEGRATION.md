@@ -66,36 +66,58 @@ This is physical functional evidence, not a certification or exhaustive
 interoperability result. Online PAOS and PQC were not part of this check.
 
 
-### Additional PersoSim test card
+### PersoSim test cards
 
-`eid-persosim03` is installed once without replacing existing drafts. Its signed
-synthetic identity is immutable; custom eID drafts retain their own local test PKI.
-PersoSim data and CA keys are taken from Profile03 at upstream commit
-`2b04578928ae5a1b40189dabe87c4939cb69bdf1`.
-`python3 scripts/prepare_test_fixture.py /path/to/ePassport` pins the original XML,
-extracts no secret from a real document, and stages ignored private build inputs.
-Only the unsigned obsolete CVCA/date administration nodes are removed: the app
-pins current Governikus `DETESTeID00009` separately and uses current card time.
-A native regression compares every signed file, DG and CA key with the original.
-The external BSI Test-CSCA09 public certificate is pinned independently by SHA-256.
-No protocol-core source is changed. The preset uses the existing validated
-`PersonalizedProfile::load -> into_card -> application` API because the generic
-host's additional PA report expects newly generated SecurityInfos. Validation,
-licensing, TA authorization and secure messaging remain in the same eID core.
-The opt-in `check_eid_test_profile` example checks import, rejection of modified
-signed DGs and eID selection using an isolated copy of synthetic app state.
-Do not infer successful official self-disclosure from this local check; that
-requires a separate AusweisApp run against the physical NFC reader.
+The catalog adds Profile01–11 and ProfileUB01–05 once, preserving existing drafts
+and the existing `eid-persosim03` ID. GlobalTester is excluded. Provenance and
+SHA-256 pins are in `persosim-fixtures.lock.json`, upstream revision
+`2b04578928ae5a1b40189dabe87c4939cb69bdf1`. The catalog generator decodes each
+profile through the shared core and verifies its CardSecurity against the
+independently pinned BSI Test-CSCA09 certificate. Preparation removes only the
+unsigned obsolete CVCA/date administration; signed files, DGs and test CA keys
+remain byte-identical. Current Governikus `DETESTeID00009` is pinned separately.
 
+Signed originals cannot be edited. The editor offers an editable copy using the
+existing local test PKI, so it is no longer advertised as a BSI-signed test card.
+DG1–22 are listed directly, excluding reserved DG16. Complex values use the
+existing core JSON representation. CAN/PIN/PUK and initial remaining counters are
+stored in the draft and included in the native cache identity. PIN counts are
+0–3 and remaining PUK uses 0–10, as enforced by the shared core. These are initial
+card states, not configurable protocol maxima: successful PIN authentication
+restores the standard three tries. Reconnecting the same native profile retains
+its card-owned counters. Transport-PIN remains visibly disabled pending shared
+core support; requesting it through a draft fails explicitly, rather than being
+misrepresented as PIN deactivation.
 
-Hardware verification on 2026-10-20, Galaxy S23 Ultra + REINER SCT cyberJack RFID
-basis, official AusweisApp test self-disclosure: PACE, terminal certificate chain,
-TA and CA (AES-128, key 41) completed. The service then sent a batch containing
-RI and DG reads. RI returned protected 6982 (effective requested CHAT has no RI
-right), DG1–10/13/17 returned protected data, absent DG19 returned protected 6A82.
-The remote service ended with `Paos_Error_AL_Internal_Error: Cannot decrypt
-ResponseAPDU`. An independent Python cryptography check derived the CA session
-from the public synthetic test key and recorded EAC2 nonce/public key: all 17
-responses had valid AES-CMAC, all encrypted data had valid ISO7816 padding.
-This is NOT a passed official self-disclosure. No RI authorization was broadened,
-no failed PA/SM check bypassed, and no core source modified to conceal the result.
+The app uses the shared `PersonalizedProfile::load -> into_card -> application`
+API for signed profiles. No app-specific APDU or license implementation exists.
+The shared eID revision includes the official-reader interoperability fixes:
+SELECT P2=0C suppresses FCI; protected outer SW matches DO99; RI key1 honors its
+signed `authorizedOnly` policy while still requiring TA/CA and the signed sector
+key binding. Key2 retains privileged authorization.
+
+On 2026-10-20 the user confirmed full official AusweisApp test self-disclosure
+working with Profile03 on Galaxy S23 Ultra and REINER SCT cyberJack RFID basis
+after those fixes. This confirmation does not establish official service
+acceptance for every fixture or for edited copies. The `check_eid_test_profile`
+example separately checks all 16 imports, signature protection and SELECT using
+an isolated copy of synthetic Android state. No proprietary binaries or keys are
+published with this Apache-2.0 app source.
+
+Validation of the 16-profile/editor update on 2026-10-20:
+
+- All 16: original/adapted signed-file, DG and CA-key identity; trusted
+  CardSecurity; complete import and SELECT; configured PIN=2 / PUK=7 counters
+  verified in the encrypted card state. Modified signed DGs are rejected.
+- Physical REINER SCT: original Erika passport, custom Max eID, PersoSim01 and
+  PersoSim03 each passed PACE, protected reading and stopped-card rejection.
+- TesterArmy: document artwork, simulation text, editor tabs, credential fields,
+  all supported eID rows through DG22 and absence of the add-DG action.
+- Android instrumentation: 18 isolated defaults, 16 signed fixtures, no duplicate
+  fixtures after reopen, counter range rejection, persisted drafts, Keystore proof,
+  both-core inventory and cancellation of stale/background simulation starts.
+- Native adapter: 7 unit tests; public repository/build contracts: 6 tests.
+  Android debug/test APK builds and Lint passed. The x86 Java 21 C2 compiler
+  crashed under Rosetta once; rerunning with `-XX:TieredStopAtLevel=1` passed.
+
+These checks do not claim full official online self-disclosure for all 16 profiles.

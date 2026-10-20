@@ -13,7 +13,7 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   console.log(await app.screenshot('eid-profiles'));
   await screen.getByRole('button', { name: 'Zurück', exact: true }).tap();
   await screen.getByText('ePassport', { exact: true }).tap();
-  await expect(screen.getByText('ePassport · Testprofil', { exact: true })).toBeVisible();
+  await expect(screen.getByText('ePassport · Testprofil', { exact: true }).first()).toBeVisible();
   console.log(await app.screenshot('passport-profiles'));
   await screen.getByText('Erika Mustermann', { exact: true }).tap();
   await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
@@ -21,10 +21,12 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   await expect(screen.getByText('DG2', { exact: true })).toBeVisible();
   await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('editor'));
-  await screen.getByText('Simulation', { exact: true }).tap();
+  await screen.getByTestId('nav-Simulation').getByText('Simulation', { exact: true }).tap();
   await expect(screen.getByText('Lokal auf diesem Smartphone', { exact: true })).not.toBeVisible();
-  await expect(screen.getByText('NFC-Kompatibilität geräteabhängig', { exact: true })).toBeVisible();
+  await expect(screen.getByText('NFC-Kompatibilität geräteabhängig', { exact: true })).not.toBeVisible();
   await expect(screen.getByText('Simulation starten', { exact: true })).toBeVisible();
+  await expect(screen.getByText('NFC-Simulation', { exact: true })).not.toBeVisible();
+  await expect(screen.getByText('Bereit zum Starten', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('simulation'));
   await screen.getByText('Über', { exact: true }).tap();
   await expect(screen.getByText('Versionsinfos kopieren', { exact: true })).toBeVisible();

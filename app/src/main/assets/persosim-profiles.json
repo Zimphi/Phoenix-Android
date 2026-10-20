@@ -1,0 +1,415 @@
+[
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim01",
+    "name": "PersoSim 01 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"ERIKA\"}",
+      "DG5": "{\"Text\":\"MUSTERMANN\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"19840812\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"BERLIN\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"GABLER\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"KÖLN\",\"country\":\"D\",\"street\":\"HEIDESTRAẞE 17\",\"state\":null,\"zipcode\":\"51147\"}}}",
+      "DG18": "{\"Bytes\":[2,118,5,3,21,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim02",
+    "name": "PersoSim 02 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"ANDRÉ\"}",
+      "DG5": "{\"Text\":\"MUSTERMANN\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"20010617\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"FRANKFURT (ODER)\"}}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"LÜBBENAU/SPREEWALD\",\"country\":\"D\",\"street\":\"EHM-WELK-STRAẞE 33\",\"state\":null,\"zipcode\":\"03222\"}}}",
+      "DG18": "{\"Bytes\":[2,118,18,0,102,1,150]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim03",
+    "name": "PersoSim 03 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"JOHANNA EDELTRAUT LISBETH\"}",
+      "DG5": "{\"Text\":\"MUSTERMANN\"}",
+      "DG6": "{\"Text\":\"ORDENSSCHWESTER JOHANNA\"}",
+      "DG7": "{\"Text\":\"DR.\"}",
+      "DG8": "{\"Text\":\"19680421\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"MÜNCHEN\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"VON MÜLLER-SCHWARZENBERG\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"BERLIN\",\"country\":\"D\",\"street\":\" BOUCHÉSTR. 68 A\",\"state\":null,\"zipcode\":\"12059\"}}}",
+      "DG18": "{\"Bytes\":[2,118,17,0,0,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim04",
+    "name": "PersoSim 04 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"---\"}",
+      "DG5": "{\"Text\":\"ĆOSIĆ\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"199409  \"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"PRIŠTINA\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"MANNHEIM\",\"country\":\"D\",\"street\":\"F4 14-15\",\"state\":null,\"zipcode\":\"68159\"}}}",
+      "DG18": "{\"Bytes\":[2,118,8,2,34,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim05",
+    "name": "PersoSim 05 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"AĞÇA\"}",
+      "DG5": "{\"Text\":\"ÖZM̂EN\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"1989    \"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"DESSAU-ROẞLAU\"}}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"DRESDEN\",\"country\":\"D\",\"street\":\"GROẞENHAINER STR. 133/135\",\"state\":null,\"zipcode\":\"01129\"}}}",
+      "DG18": "{\"Bytes\":[2,118,20,6,18,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim06",
+    "name": "PersoSim 06 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"HANS-GÜNTHER\"}",
+      "DG5": "{\"Text\":\"VON DREBENBUSCH-DALGOẞEN\"}",
+      "DG6": "{\"Text\":\"FREIHERR ZU MÖCKERN-WINDENSBERG\"}",
+      "DG7": "{\"Text\":\"DR.EH.DR.\"}",
+      "DG8": "{\"Text\":\"19460125\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"BREMERHAVEN\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"WEIẞ\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"HAMBURG\",\"country\":\"D\",\"street\":\"WEG NR. 12 8E\",\"state\":null,\"zipcode\":\"22043\"}}}",
+      "DG18": "{\"Bytes\":[2,118,2,0,0,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim07",
+    "name": "PersoSim 07 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"ANNEKATHRIN\"}",
+      "DG5": "{\"Text\":\"LERCH\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"19760705\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"BAD KÖNIGSHOFEN I. GRABFELD\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"BJØRNSON\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"HALLE (SAALE)\",\"country\":\"D\",\"street\":null,\"state\":null,\"zipcode\":\"06108\"}}}",
+      "DG18": "{\"Bytes\":[2,118,2,0,0,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim08",
+    "name": "PersoSim 08 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"KARL\"}",
+      "DG5": "{\"Text\":\"HILLEBRANDT\"}",
+      "DG6": "{\"Text\":\"GRAF V. LÝSKY\"}",
+      "DG7": "{\"Text\":\"DR.HC.\"}",
+      "DG8": "{\"Text\":\"19720617\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"TRIER\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Unavailable\":\"keine Wohnung in Deutschland\"}}",
+      "DG18": "{\"Bytes\":[]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim09",
+    "name": "PersoSim 09 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20301030\"}",
+      "DG4": "{\"Text\":\"LILLY\"}",
+      "DG5": "{\"Text\":\"SCHUSTER\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"20150330\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"MÜHLHAUSEN/THÜRINGEN\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"EISENACH\",\"country\":\"D\",\"street\":\"MARIENSTRAẞE 144\",\"state\":null,\"zipcode\":\"99817\"}}}",
+      "DG18": "{\"Bytes\":[2,118,22,0,86,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim10",
+    "name": "PersoSim 10 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"AFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGFGZ\"}",
+      "DG5": "{\"Text\":\"ABCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCZ\"}",
+      "DG6": "{\"Text\":\"AJKJKJKJKJKJKJKJKJKJKJKJKJKJKJKZ\"}",
+      "DG7": "{\"Text\":\"AHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIZ\"}",
+      "DG8": "{\"Text\":\"20000101\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"ALMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMLMZ\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"ADEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEZ\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"ANONONONONONONONONONONONONONONONONONONOZ\",\"country\":\"D\",\"street\":\"APQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQPQZ\",\"state\":null,\"zipcode\":\"A12345678Z\"}}}",
+      "DG18": "{\"Bytes\":[2,118,17,0,0,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosim11",
+    "name": "PersoSim 11 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"ID\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20240630\"}",
+      "DG4": "{\"Text\":\"HILDEGARD\"}",
+      "DG5": "{\"Text\":\"MÜLLER\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"19590204\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"SAARBRÜCKEN\"}}",
+      "DG10": "{\"Text\":\"D\"}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"DORTMUND\",\"country\":\"D\",\"street\":\"HARKORTSTR. 58\",\"state\":null,\"zipcode\":\"44225\"}}}",
+      "DG18": "{\"Bytes\":[2,118,5,9,19,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosimub01",
+    "name": "PersoSim UB01 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"UB\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"MAIJA\"}",
+      "DG5": "{\"Text\":\"MUSTERMANN\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"19880421\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"KANKAANPÄÄ\"}}",
+      "DG10": "{\"Text\":\"FIN\"}",
+      "DG13": "{\"Text\":\"MEIKÄLÄINEN\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"KÖLN\",\"country\":\"D\",\"street\":\"HEIDESTRAẞE 17\",\"state\":null,\"zipcode\":\"51147\"}}}",
+      "DG18": "{\"Bytes\":[2,118,5,3,21,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosimub02",
+    "name": "PersoSim UB02 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"UB\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"TOMÁŠ KAREL\"}",
+      "DG5": "{\"Text\":\"MARTINÍK\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"19610817\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"MÜNCHEN\"}}",
+      "DG10": "{\"Text\":\"CZE\"}",
+      "DG13": "{\"Text\":\"VOMÁČKA\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"LONDON\",\"country\":\"GBR\",\"street\":\"56 CROWN STREET\",\"state\":null,\"zipcode\":\"W1H 8BR\"}}}",
+      "DG18": "{\"Bytes\":[8,38,0,0,0,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosimub03",
+    "name": "PersoSim UB03 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"UB\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"MARIA ELENA INÊS\"}",
+      "DG5": "{\"Text\":\"GARCIA LÓPEZ\"}",
+      "DG6": "{\"Text\":\"SCHWESTER ANNA\"}",
+      "DG7": "{\"Text\":\"DR.\"}",
+      "DG8": "{\"Text\":\"19640812\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"GRANADA\"}}",
+      "DG10": "{\"Text\":\"ESP\"}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"EISENACH\",\"country\":\"D\",\"street\":\"AMTSPLATZ 4A\",\"state\":null,\"zipcode\":\"99817\"}}}",
+      "DG18": "{\"Bytes\":[2,118,22,0,86,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosimub04",
+    "name": "PersoSim UB04 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"UB\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"PADDY\"}",
+      "DG5": "{\"Text\":\"Ó RUDAÍ\"}",
+      "DG6": "{\"Text\":\"MISTER BARISTA\"}",
+      "DG7": "{\"Text\":\"DR.HC.\"}",
+      "DG8": "{\"Text\":\"195309  \"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"BALLYCLOUGH\"}}",
+      "DG10": "{\"Text\":\"IRL\"}",
+      "DG13": "{\"Text\":\"\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"MANNHEIM\",\"country\":\"D\",\"street\":\"R3 3-5\",\"state\":null,\"zipcode\":\"68161\"}}}",
+      "DG18": "{\"Bytes\":[2,118,8,2,34,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  },
+  {
+    "format": "phoenix-android-draft-v1",
+    "id": "eid-persosimub05",
+    "name": "PersoSim UB05 Testausweis",
+    "kind": "eid",
+    "groups": {
+      "DG1": "{\"Text\":\"UB\"}",
+      "DG2": "{\"Text\":\"D\"}",
+      "DG3": "{\"Text\":\"20350630\"}",
+      "DG4": "{\"Text\":\"ÅSA\"}",
+      "DG5": "{\"Text\":\"LÆRKE\"}",
+      "DG6": "{\"Text\":\"\"}",
+      "DG7": "{\"Text\":\"\"}",
+      "DG8": "{\"Text\":\"19950612\"}",
+      "DG9": "{\"GeneralPlace\":{\"Freetext\":\"OSLO\"}}",
+      "DG10": "{\"Text\":\"DNK\"}",
+      "DG13": "{\"Text\":\"BJØRNSON\"}",
+      "DG17": "{\"GeneralPlace\":{\"Structured\":{\"city\":\"KONTIOLAHTI\",\"country\":\"FIN\",\"street\":\"AHLSTRÖMINKATU 2\",\"state\":null,\"zipcode\":\"81100\"}}}",
+      "DG18": "{\"Bytes\":[2,70,0,0,0,0,0]}"
+    },
+    "settings": {
+      "can": "123456",
+      "pin": "123456",
+      "puk": "1234567890"
+    }
+  }
+]

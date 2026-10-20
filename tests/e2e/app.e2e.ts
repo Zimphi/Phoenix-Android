@@ -14,7 +14,7 @@ test('profiles open their editor and data groups; legal and actual versions are 
   await expect(screen.getByText('Profil importieren')).not.toBeVisible();
   await screen.getByRole('button', { name: 'Zurück', exact: true }).tap();
   await screen.getByText('ePassport', { exact: true }).tap();
-  await expect(screen.getByText('ePassport · Testprofil', { exact: true })).toBeVisible();
+  await expect(screen.getByText('ePassport · Testprofil', { exact: true }).first()).toBeVisible();
   await screen.getByText('Erika Mustermann').tap();
   await expect(screen.getByText('Profil importieren')).toBeVisible();
   await screen.getByText('Datengruppen').tap();

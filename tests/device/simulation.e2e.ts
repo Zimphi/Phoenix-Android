@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { test } from '@e2e-dev/mobile';
 import { expect } from 'e2e';
 
-for (const name of ['Erika Mustermann', 'Max Mustermann', 'PersoSim 03 Testausweis']) {
+for (const name of ['Erika Mustermann', 'Max Mustermann', 'PersoSim 01 Testausweis', 'PersoSim 03 Testausweis']) {
   test(`${name} starts and stops the real local simulation`, { timeout: 90_000 }, async ({ app, screen }) => {
     await app.open();
     await screen.getByTestId('nav-Profile').getByText('Profile', { exact: true }).tap();
@@ -17,7 +17,7 @@ for (const name of ['Erika Mustermann', 'Max Mustermann', 'PersoSim 03 Testauswe
       await screen.getByRole('button').tap();
     }
     await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
-    await screen.getByText('Simulation', { exact: true }).tap();
+    await screen.getByTestId('nav-Simulation').getByText('Simulation', { exact: true }).tap();
     await screen.getByText('Simulation starten', { exact: true }).tap();
     await expect(screen.getByText('Bereit für Lesegerät', { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(screen.getByText('Simulation beenden', { exact: true })).toBeVisible();

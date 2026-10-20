@@ -1,0 +1,28 @@
+import { test } from '@e2e-dev/mobile';
+import { expect } from 'e2e';
+test('eID editor exposes all supported data groups and credential settings', async ({ app, screen }) => {
+  await app.open();
+  await screen.getByTestId('nav-Profile').getByText('Profile', { exact: true }).tap();
+  await screen.getByText('eID', { exact: true }).tap();
+  await screen.getByText('Max Mustermann', { exact: true }).tap();
+  await expect(screen.getByText('DG1', { exact: true })).toBeVisible();
+  await expect(screen.getByText('Datengruppe hinzufügen', { exact: true })).not.toBeVisible();
+  await screen.getByText('DG1', { exact: true }).tap();
+  await expect(screen.getByText('DG1 bearbeiten', { exact: true })).toBeVisible();
+  await screen.getByTestId('cancel-group').getByRole('button').tap();
+  await screen.getByText('Einstellungen', { exact: true }).tap();
+  await expect(screen.getByRole('textbox').filter({ has: screen.getByText('CAN', { exact: true }) })).toBeVisible();
+  await expect(screen.getByRole('textbox').filter({ has: screen.getByText('PIN', { exact: true }) })).toBeVisible();
+  await expect(screen.getByRole('textbox').filter({ has: screen.getByText('PUK', { exact: true }) })).toBeVisible();
+  await expect(screen.getByRole('textbox').filter({ has: screen.getByText('PIN-Versuche (0–3)', { exact: true }) })).toBeVisible();
+  await expect(screen.getByRole('textbox').filter({ has: screen.getByText('PUK-Nutzungen (0–10)', { exact: true }) })).toBeVisible();
+  await expect(screen.getByRole('group', { name: 'Transport-PIN-Modus', exact: true })).toBeVisible();
+  console.log(await app.screenshot('eid-credentials'));
+  await screen.getByText('Datengruppen', { exact: true }).tap();
+  for (let i=0;i<4;i++) await screen.swipe({ direction: 'down' });
+  await expect(screen.getByText('DG22', { exact: true })).toBeVisible();
+  await expect(screen.getByText('DG16', { exact: true })).not.toBeVisible();
+  await screen.getByText('DG22', { exact: true }).tap();
+  await expect(screen.getByText('DG22 bearbeiten', { exact: true })).toBeVisible();
+  await screen.getByTestId('cancel-group').getByRole('button').tap();
+});
