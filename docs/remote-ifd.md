@@ -1,0 +1,13 @@
+# Android Remote IFD
+
+Implement the existing shared eID core's `IFDInterface_WebSocket_v2` (BSI TR-03112-6 supplement) in the Android Simulation tab. User-facing name: IFD-Schnittstelle. Use two icon selectors for NFC and IFD; keep pairing and removal in Einstellungen → IFD-Schnittstelle, independently of the selected profile. Android is the IFD, desktop AusweisApp is the user device. NFC remains the default; WLAN is explicitly selected and supports eID profiles. No protocol fork or cloud relay.
+
+Use the existing Rust TLS identity, PeerStore, PairingSession, discovery and authenticated WebSocket server. Pairing is explicit, four-digit PSK, expires after five minutes and five failed attempts; pairing connections cannot send card APDUs. Subsequent connections require pinned mutual TLS. Keep identity encrypted in app-private storage with the existing local profile secret. Stop sockets/discovery when simulation stops or the app loses foreground; do not allow simultaneous NFC/WLAN sessions. Do not log PINs, codes, certificates or APDUs.
+
+Build order: native lifecycle adapter and boundary tests; Compose transport selector and pairing/status; install, TesterArmy UI regression, actual AusweisApp pairing and test self-disclosure. Verify reconnect, failed pairing, stop and NFC regression. Report actual runtime evidence and any untested cases. Preserve synthetic profiles and core source pins.
+
+Source: https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/TechnischeRichtlinien/TR03112/TR-03112-api_teil6_ergaenzung.pdf?__blob=publicationFile&v=3
+
+Code lives in `native/src/remote.rs` and existing JNI dispatch; UI in `Screens.kt` and `MainActivity.kt`. Keep existing Kotlin/Rust conventions. Tests: `python3 -m unittest discover -s tests`, `cargo test --manifest-path native/Cargo.toml --locked --offline`, `npm run test:e2e`, device suite `npm run test:e2e:native`; Gradle `:app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` using the configured Android SDK/NDK.
+
+The app configures a unique X.509 communication subject (CN plus a serialNumber derived from the public key) through the existing TlsIdentity API. Legacy empty-subject app certificates are reissued atomically using the existing encrypted key; paired clients must pair again after this one-time certificate change. Empty subjects collide with previously paired empty-subject simulator certificates in an OpenSSL trust store. The regression test verifies both anchors can coexist and that restarts preserve the new identity. No protocol-core changes or certificate-verification exceptions are used.

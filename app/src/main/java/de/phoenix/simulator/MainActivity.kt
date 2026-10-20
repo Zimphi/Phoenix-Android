@@ -30,7 +30,7 @@ class MainActivity:ComponentActivity() {
         setContent { MaterialTheme(typography=PhoenixTypography,colorScheme=lightColorScheme(primary=Blue,onPrimary=androidx.compose.ui.graphics.Color.White,background=Page,surface=Page,onSurface=Navy)) { ProvideTextStyle(TextStyle(fontFamily=PhoenixFont,fontSize=14.sp,lineHeight=TextUnit.Unspecified,letterSpacing=0.sp)) { Phoenix() } } }
     }
     override fun onResume(){super.onResume();CardService.foreground(true);val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,CardService::class.java))}
-    override fun onPause(){CardService.foreground(false);NfcAdapter.getDefaultAdapter(this)?.let{if(packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(it).unsetPreferredService(this)};super.onPause()}
+    override fun onPause(){CardService.foreground(false);RemoteReader.stop();NfcAdapter.getDefaultAdapter(this)?.let{if(packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(it).unsetPreferredService(this)};super.onPause()}
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -48,8 +48,12 @@ class MainActivity:ComponentActivity() {
     var creating by remember{mutableStateOf(false)}
     var editing by remember{mutableStateOf<String?>(null)}
     var status by remember{mutableStateOf("Simulation nicht aktiv")}
+    var wlan by remember{mutableStateOf(false)}
+    var remoteState by remember{mutableStateOf(JSONObject())}
+    var pairBusy by remember{mutableStateOf(false)}
+    var forgetPairing by remember{mutableStateOf(false)}
     val coreReady=remember{CompletableDeferred<Unit>()}
-    LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
+    LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(page!="IFD-Schnittstelle")withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"))}};remoteState=JSONObject();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
     LaunchedEffect(Unit) {
         val initialization=withContext(Dispatchers.IO){
             runCatching {
@@ -60,6 +64,13 @@ class MainActivity:ComponentActivity() {
         }
         initialization.fold({coreReady.complete(Unit)},{coreReady.completeExceptionally(it)})
         if(initialization.isSuccess)withContext(Dispatchers.IO){runCatching{TrialActivation.activate()}.onFailure{android.util.Log.w("Phoenix","Hintergrundinitialisierung noch nicht verfügbar")}}
+    }
+    LaunchedEffect(page,wlan,status) {
+        if(page=="IFD-Schnittstelle"||(page=="Simulation"&&wlan&&status=="Bereit für Lesegerät"))while(isActive){
+            val state=withContext(Dispatchers.IO){runCatching{coreReady.await();NativeCore.call(JSONObject().put("op","ifd_status"))}}
+            state.onSuccess{remoteState=it;if(page=="Simulation"&&!it.optBoolean("running")){status="Simulation beendet";if(it.optString("last_error").isNotEmpty())message=it.optString("last_error")}}
+            delay(1000)
+        }
     }
     val clipboard=LocalClipboardManager.current
     val components=remember{JSONObject(context.assets.open("components.lock.json").use{ProfileStore.read(it)})}
@@ -86,8 +97,9 @@ class MainActivity:ComponentActivity() {
         when {
             status in listOf("Simulation wird gestartet …","Simulation wird beendet …")->Unit
             profile==null->message="Zuerst ein Profil auswählen"
-            adapter==null||!adapter.isEnabled->message="NFC ist nicht eingeschaltet"
-            !context.packageManager.hasSystemFeature("android.hardware.nfc.hce")->message="Keine NFC-Kartenemulation verfügbar"
+            wlan&&profile.kind!="eid"->message="WLAN-Kartenleser unterstützt eID-Profile"
+            !wlan&&(adapter==null||!adapter.isEnabled)->message="NFC ist nicht eingeschaltet"
+            !wlan&&!context.packageManager.hasSystemFeature("android.hardware.nfc.hce")->message="Keine NFC-Kartenemulation verfügbar"
             else->{
                 val session=CardService.beginStart()
                 val draft=profile.json()
@@ -96,13 +108,30 @@ class MainActivity:ComponentActivity() {
                     val result=withContext(Dispatchers.IO){runCatching{
                         coreReady.await()
                         TrialActivation.activate()
-                        NativeCore.call(JSONObject().put("op","mount_draft").put("draft",draft))
+                        NativeCore.call(JSONObject().put("op","ifd_stop"))
+                        NativeCore.call(if(wlan)JSONObject().put("op","ifd_start").put("draft",draft).put("pair",false) else JSONObject().put("op","mount_draft").put("draft",draft))
                     }}
-                    result.onSuccess {
-                        status=if(page=="Simulation"&&selected?.id==profile.id&&CardService.activate(session))"Bereit für Lesegerät" else "Simulation beendet"
+                    result.onSuccess { state->
+                        val valid=page=="Simulation"&&selected?.id==profile.id&&CardService.completeStart(session,!wlan)
+                        if(valid&&wlan)remoteState=state
+                        if(!valid)withContext(Dispatchers.IO){NativeCore.call(JSONObject().put("op","ifd_stop"))}
+                        status=if(valid)"Bereit für Lesegerät" else "Simulation beendet"
                     }.onFailure {CardService.deactivate();status="Simulation nicht verfügbar";message=it.message}
                 }
             }
+        }
+    }
+    fun pairReader() {
+        if(pairBusy)return
+        pairBusy=true
+        val session=CardService.beginStart()
+        scope.launch {
+            val result=withContext(Dispatchers.IO){runCatching{coreReady.await();TrialActivation.activate();NativeCore.call(JSONObject().put("op","ifd_pair"))}}
+            result.onSuccess{
+                if(page=="IFD-Schnittstelle"&&CardService.completeStart(session,false))remoteState=it
+                else withContext(Dispatchers.IO){NativeCore.call(JSONObject().put("op","ifd_stop"))}
+            }.onFailure{message=it.message}
+            pairBusy=false
         }
     }
     val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
@@ -111,11 +140,11 @@ class MainActivity:ComponentActivity() {
             if(page=="Profile"||page=="Simulation") {
                 Brand(Modifier.size(34.dp,42.dp));Spacer(Modifier.width(8.dp));Text("Phoenix",fontSize=20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
             }else{
-                if(page in listOf("Editor","Einstellungen","Profilliste"))IconButton({page=when(page){"Editor"->"Profilliste";"Profilliste"->"Profile";else->"Über"}},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
+                if(page in listOf("Editor","Einstellungen","Profilliste","IFD-Schnittstelle"))IconButton({page=when(page){"Editor"->"Profilliste";"Profilliste"->"Profile";"IFD-Schnittstelle"->"Einstellungen";else->"Über"}},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
                 if(page=="Editor"||page=="Profilliste") {Spacer(Modifier.weight(1f));Brand(Modifier.size(30.dp,38.dp))}
                 else Text(page,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.6).sp,color=Navy,modifier=Modifier.weight(1f))
             }
-            if(page !in listOf("Einstellungen","Editor","Profilliste"))IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
+            if(page !in listOf("Einstellungen","Editor","Profilliste","IFD-Schnittstelle"))IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
         }
         Box(Modifier.weight(1f).padding(horizontal=Inset).padding(top=8.dp,bottom=16.dp)) {
             val visibleProfiles=remember(revision){store.profiles.toList()}
@@ -131,19 +160,25 @@ class MainActivity:ComponentActivity() {
                         runCatching{val draft=profile.json().put("id","eid-copy-"+java.util.UUID.randomUUID().toString()).put("name",profile.name+" · Kopie");store.importDraft(draft.toString())}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
                     },{group->if(profile.signedFixture)message="Signiertes PersoSim-Testprofil: Datengruppen sind unveränderlich. Eigene Daten bitte in einem separaten Profil bearbeiten." else editing=group})}
                     "Über"->About(components){clipboard.setText(androidx.compose.ui.text.AnnotatedString("Phoenix Android ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n$components"));Toast.makeText(context,"Versionsinfos kopiert",Toast.LENGTH_SHORT).show()}
-                    "Einstellungen"->Settings{legal=it}
-                    "Simulation"->Simulation(selected,status,::startSimulation,{
+                    "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"})
+                    "IFD-Schnittstelle"->ReaderSettings(remoteState,pairBusy,::pairReader,{
+                        scope.launch{withContext(Dispatchers.IO){NativeCore.call(JSONObject().put("op","ifd_stop"))};remoteState=JSONObject()}
+                    },{forgetPairing=true})
+                    "Simulation"->Simulation(selected,status,{startSimulation()},{
                         CardService.deactivate();status="Simulation wird beendet …"
                         scope.launch {
-                            withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","close"))}}
-                            status="Simulation beendet"
+                            withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"));NativeCore.call(JSONObject().put("op","close"))}}
+                            remoteState=JSONObject();status="Simulation beendet"
                         }
-                    })
+                    },wlan,{wlan=it},remoteState)
                 }
             }
         }
         Navigation(active){page=it}
     }
+    if(forgetPairing)AlertDialog(onDismissRequest={forgetPairing=false},title={Text("Kopplungen entfernen?")},text={Text("Die AusweisApp muss anschließend erneut gekoppelt werden.")},confirmButton={TextButton({
+        forgetPairing=false;scope.launch{withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_forget"))}.onFailure{message=it.message}};remoteState=JSONObject()}
+    }){Text("Entfernen")}},dismissButton={TextButton({forgetPairing=false}){Text("Abbrechen")}})
     if(message!=null)AlertDialog(onDismissRequest={message=null},title={Text("Phoenix")},text={Text(message!!)},confirmButton={TextButton({message=null}){Text("OK")}})
     if(creating)AlertDialog(onDismissRequest={creating=false},title={Text("Neues Testprofil")},text={Column{
         listOf("epassport" to "ePassport","eid" to "eID").forEach{(kind,label)->Action(label,false){createProfile(kind)}}
@@ -159,7 +194,7 @@ class MainActivity:ComponentActivity() {
     legal?.let{title->
         val text=remember(title){when(title){
             "Impressum"->"Phoenix Android\nhttps://github.com/Zimphi/Phoenix-Android\n\nVerantwortlichen- und Kontaktangaben sind vor Veröffentlichung einer App-Distribution zu ergänzen."
-            "Datenschutz"->"Diese Entwicklungsversion speichert synthetische Profilentwürfe lokal auf dem Gerät. Keine Analyse- oder Werbedienste.\n\nDie Hintergrundaktivierung verwendet den Phoenix Lizenz-Testrelay über HTTPS. Übermittelt werden pseudonyme Geräte- und Anfragehashes sowie die ausgewählten Core-Produkte. Der private Geräteschlüssel bleibt im Android Keystore. Die native Lizenzprüfung benötigt zusätzlich authentifizierte Zeit von Netnod bzw. Cloudflare. Profile und NFC-APDUs werden dafür nicht übertragen. Die Cloud-Simulation ist nicht umgesetzt."
+            "Datenschutz"->"Diese Entwicklungsversion speichert synthetische Profilentwürfe lokal auf dem Gerät. Keine Analyse- oder Werbedienste.\n\nDie Hintergrundaktivierung verwendet den Phoenix Lizenz-Testrelay über HTTPS. Übermittelt werden pseudonyme Geräte- und Anfragehashes sowie die ausgewählten Core-Produkte. Der private Geräteschlüssel bleibt im Android Keystore. Die native Lizenzprüfung benötigt zusätzlich authentifizierte Zeit von Netnod bzw. Cloudflare. Profile und NFC-APDUs werden dafür nicht übertragen. Bei ausdrücklich gestarteter WLAN-Simulation wird das ausgewählte synthetische eID-Profil über eine verschlüsselte Remote-IFD-Verbindung an eine gekoppelte AusweisApp im lokalen Netzwerk übermittelt. Die Kopplung verwendet einen zeitlich begrenzten Code; anschließend werden die Kommunikationszertifikate geprüft. Beim Verlassen der Simulation oder beim Wechsel in den Hintergrund endet der WLAN-Kartenleser. Die Cloud-Simulation ist nicht umgesetzt."
             else->context.assets.open("THIRD_PARTY_NOTICES.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LICENSE.txt").use{ProfileStore.read(it)}
         }}
         AlertDialog(onDismissRequest={legal=null},title={Text(title)},text={Text(text,Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()))},confirmButton={TextButton({legal=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("close-legal")){Text("Schließen")}})

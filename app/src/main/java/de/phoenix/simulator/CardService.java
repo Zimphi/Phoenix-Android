@@ -15,8 +15,11 @@ public final class CardService extends HostApduService {
     static synchronized void foreground(boolean value) { foreground=value; if(!value)deactivate(); }
     static synchronized long beginStart() { active=false; return ++generation; }
     static synchronized boolean activate(long session) {
+        return completeStart(session,true);
+    }
+    static synchronized boolean completeStart(long session, boolean nfc) {
         if(!foreground || session!=generation) return false;
-        active=true; return true;
+        active=nfc; return true;
     }
     @Override public byte[] processCommandApdu(byte[] apdu, Bundle extras) {
         final long session;

@@ -10,7 +10,9 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
 - Document type with profile counts → filtered profile list → editor → data
   groups/settings; import belongs in the editor. Every listed profile shows its document type.
 - About displays actual app/build and bundled core version/commit identifiers.
-- Settings contains Legal, Privacy, licenses and a disabled planned cloud entry.
+- Settings contains Legal, Privacy, licenses, IFD pairing and a disabled planned cloud entry.
+- eID simulation offers NFC and IFD icon selectors below the phone illustration.
+  Switching transport preserves the layout; pairing belongs in Settings → IFD-Schnittstelle.
 - NFC APDUs execute locally through the unchanged core implementation; no
   substitute protocol engine and no cloud fallback.
 - Android, local and Vercel must use the same source revisions. Target binaries differ.
@@ -63,3 +65,17 @@ The full physical authentication test uses the existing local eID Client and
 IS Terminal: `PHOENIX_AUTH_MATERIAL=/private/test-directory npm run test:e2e:native
 -- --grep 'full authentication'`. Preparation, verified profiles and the required
 Android AID preselection are documented in [INTEGRATION.md](docs/INTEGRATION.md).
+
+## Smartphone as IFD reader
+
+Connect the phone and desktop to the same local network. In Phoenix, open
+Settings → IFD-Schnittstelle and start pairing. In desktop AusweisApp, select
+Phoenix Android under Settings → Smartphone as card reader and enter the code.
+The code expires after five minutes or five failed attempts. Pairing exposes no
+card; select an eID profile, choose IFD-Schnittstelle in Simulation and start it
+to make that synthetic card available. Subsequent connections use mutual TLS.
+Stopping simulation, leaving the simulation page, or backgrounding Phoenix closes
+the network reader. Pairings persist across restarts and can be removed in settings.
+
+Implementation and verification: [docs/remote-ifd.md](docs/remote-ifd.md).
+The shared protocol cores and their source revisions are unchanged by this adapter.

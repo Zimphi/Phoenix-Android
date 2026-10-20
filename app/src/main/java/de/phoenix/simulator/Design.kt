@@ -58,7 +58,7 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
         "layers"->R.drawable.icon_layers;"add"->R.drawable.icon_circle_plus;"back"->R.drawable.icon_arrow_left;"chevron"->R.drawable.icon_chevron_right
         "edit"->R.drawable.icon_pencil;"import"->R.drawable.icon_file_input;"save"->R.drawable.icon_save;"cloud"->R.drawable.icon_cloud
         "privacy"->R.drawable.icon_shield_check;"legal"->R.drawable.icon_scale;"file"->R.drawable.icon_file_text;"eid"->R.drawable.icon_id_card
-        "epassport"->R.drawable.icon_globe;"phone"->R.drawable.icon_smartphone;"wifi"->R.drawable.icon_wifi;"stop"->R.drawable.icon_square;"copy"->R.drawable.icon_copy
+        "epassport"->R.drawable.icon_globe;"phone"->R.drawable.icon_smartphone;"contactless"->R.drawable.icon_contactless;"ifd"->R.drawable.icon_ifd;"wifi"->R.drawable.icon_wifi;"stop"->R.drawable.icon_square;"copy"->R.drawable.icon_copy
         else->R.drawable.icon_settings
     }
     Icon(painterResource(resource),contentDescription=null,tint=color,modifier=modifier)

@@ -1,6 +1,10 @@
 package de.phoenix.simulator
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -103,7 +107,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Settings(onLegal:(String)->Unit) {
+@Composable internal fun Settings(onLegal:(String)->Unit,onReader:()->Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Text("Verbindungen",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Navy)
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -116,7 +120,14 @@ import org.json.JSONObject
             Text("Noch nicht implementiert",fontSize=13.sp,color=Muted)
             }
         }
-        Text("Simulation lokal auf dem Smartphone",fontSize=12.sp,color=Muted)
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).clickable(onClick=onReader).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            Glyph("wifi",Blue,Modifier.size(30.dp))
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text("IFD-Schnittstelle",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=Navy)
+                Text("Smartphone als Kartenleser · Kopplung",fontSize=12.sp,color=Muted)
+            }
+            Glyph("chevron",Muted,Modifier.size(19.dp))
+        }
         Spacer(Modifier.height(12.dp))
         Text("Rechtliches",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Navy)
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(Pale)) {
@@ -193,8 +204,8 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Simulation(profile:Profile?,status:String,onStart:()->Unit,onStop:()->Unit) {
-    val active=status=="Bereit für Lesegerät"&&CardService.active()
+@Composable internal fun Simulation(profile:Profile?,status:String,onStart:()->Unit,onStop:()->Unit,wlan:Boolean,onMode:(Boolean)->Unit,remote:JSONObject) {
+    val active=status=="Bereit für Lesegerät"&&(if(wlan)remote.optBoolean("running") else CardService.active())
     val starting=status=="Simulation wird gestartet …"
     val stopping=status=="Simulation wird beendet …"
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -202,8 +213,18 @@ import org.json.JSONObject
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(Space),horizontalAlignment=Alignment.CenterHorizontally) {
         Text("Simulation",fontSize=27.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.8).sp,color=Navy,modifier=Modifier.fillMaxWidth())
         Art("nfc",Modifier.fillMaxWidth().height(artHeight))
-        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Text("Smartphone an das Lesegerät halten",fontSize=12.sp,color=Muted,textAlign=TextAlign.Center)
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            listOf(false to "NFC",true to "IFD-Schnittstelle").forEach{(remoteMode,label)->
+                val enabled=!active&&!starting&&!stopping&&(!remoteMode||profile?.kind=="eid")
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if(wlan==remoteMode)Pale else Page).border(1.dp,if(wlan==remoteMode)Blue else Border,RoundedCornerShape(14.dp))
+                    .selectable(selected=wlan==remoteMode,enabled=enabled,role=Role.RadioButton,onClick={onMode(remoteMode)}).semantics{contentDescription=label}.padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    Glyph(if(remoteMode)"ifd" else "contactless",if(enabled)Blue else Muted,Modifier.size(26.dp))
+                    Text(label,fontSize=12.sp,color=if(enabled)Navy else Muted,fontWeight=FontWeight.SemiBold)
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().height(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+            Text(if(wlan)"Smartphone als Kartenleser" else "Smartphone an das Lesegerät halten",fontSize=12.sp,color=Muted,textAlign=TextAlign.Center)
         }
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(if(active)"AKTIVES PROFIL" else "AUSGEWÄHLTES PROFIL",fontSize=10.sp,fontWeight=FontWeight.SemiBold,color=Blue)
@@ -216,10 +237,31 @@ import org.json.JSONObject
             }
             HorizontalDivider(color=Border)
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                Glyph("wifi",Muted,Modifier.size(18.dp));Text(status,fontSize=11.sp,color=Muted)
+                Glyph("wifi",Muted,Modifier.size(18.dp));Text(if(wlan&&active) {if(remote.optBoolean("pairing"))"Kopplung mit AusweisApp" else "IFD-Schnittstelle aktiv"}else status,fontSize=11.sp,color=Muted)
             }
         }
         if(active)Action("Simulation beenden",false,onClick=onStop) else Action(if(starting)"Wird gestartet …" else if(stopping)"Wird beendet …" else "Simulation starten",enabled=!starting&&!stopping,onClick=onStart)
     }
+    }
+}
+
+@Composable internal fun ReaderSettings(state:JSONObject,busy:Boolean,onPair:()->Unit,onStop:()->Unit,onForget:()->Unit) {
+    val running=state.optBoolean("running")
+    val pairing=state.optBoolean("pairing")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+        Glyph("wifi",Blue,Modifier.size(44.dp))
+        Text("Smartphone als Kartenleser",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Navy)
+        Text("AusweisApp über das lokale WLAN verbinden",fontSize=13.sp,color=Muted,textAlign=TextAlign.Center)
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+            Text(if(pairing)"Kopplungscode" else if(state.optInt("paired")>0)"AusweisApp gekoppelt" else "Noch nicht gekoppelt",fontSize=14.sp,fontWeight=FontWeight.SemiBold,color=Navy)
+            if(pairing)Text(state.optString("pairing_code"),fontSize=34.sp,fontWeight=FontWeight.Bold,color=Blue,letterSpacing=7.sp)
+            Text(if(pairing)"In der AusweisApp unter Einstellungen → Smartphone als Kartenleser dieses Gerät auswählen und den Code eingeben. Gültig für 5 Minuten." else "${state.optInt("paired")} gekoppelte Geräte",fontSize=12.sp,color=Muted,textAlign=TextAlign.Center)
+            if(running)Text(RemoteReader.addresses(),fontSize=12.sp,color=Muted)
+            if(state.optString("last_error").isNotEmpty())Text(state.optString("last_error"),fontSize=12.sp,color=MaterialTheme.colorScheme.error)
+        }
+        Text("In der Simulation anschließend das eID-Profil und die IFD-Schnittstelle auswählen und starten.",fontSize=13.sp,color=Muted,textAlign=TextAlign.Center)
+        if(running)Action("Kopplung beenden",false,onClick=onStop)
+        else Action(if(busy)"Kopplung wird gestartet …" else "Kopplung starten",enabled=!busy,onClick=onPair)
+        if(state.optInt("paired")>0&&!busy)Action("Kopplungen entfernen",false,onClick=onForget)
     }
 }
