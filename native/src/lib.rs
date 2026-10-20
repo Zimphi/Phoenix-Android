@@ -18,6 +18,8 @@ static RUNTIME: OnceLock<Mutex<(Native,Option<phoenix_eid_core::application::App
 #[serde(tag="op", rename_all="snake_case", deny_unknown_fields)]
 enum Request {
     Inventory,
+    DescribeDraft {draft:Value},
+    PassportCatalog,
     IfdStart {draft:Value, pair:bool},
     IfdPair,
     IfdForget,
@@ -36,6 +38,8 @@ enum Request {
 fn dispatch(request: &str) -> Result<Value> {
     ensure!(request.len() <= 32*1024*1024,"Request size limit");
     let request:Request=serde_json::from_str(request)?;
+    if matches!(request,Request::PassportCatalog){return phoenix_simulator::passport_catalog::drafts();}
+    if let Request::DescribeDraft{draft}=request{return provision::describe(draft);}
     if matches!(request,Request::IfdStatus|Request::IfdStop|Request::IfdForget) {
         let mut reader=READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?;
         return match request {
@@ -49,7 +53,7 @@ fn dispatch(request: &str) -> Result<Value> {
     let mut native=RUNTIME.get().context("Native Laufzeit nicht initialisiert")?.lock().map_err(|_|anyhow::anyhow!("Core-Zustand nicht verfügbar"))?;
     let (native,application)=&mut *native;
     match request {
-        Request::IfdStatus|Request::IfdStop|Request::IfdForget=>unreachable!(),
+        Request::IfdStatus|Request::IfdStop|Request::IfdForget|Request::DescribeDraft{..}|Request::PassportCatalog=>unreachable!(),
         Request::IfdPair=>{
             let root=ROOT.get().context("App root missing")?;
             let mut reader=READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?;

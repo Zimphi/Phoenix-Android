@@ -14,10 +14,12 @@ import org.json.JSONObject
 class SmokeInstrumentation:Instrumentation() {
     private var activation=false
     private var importDraft:String?=null
-    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";importDraft=arguments?.getString("importDraft");start()}
+    private var pki=false
+    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";pki=arguments?.getString("pki")=="true";importDraft=arguments?.getString("importDraft");start()}
     override fun onStart(){
         val result=Bundle()
         try{
+            if(pki){result.putString("stream",verifyPkiDevice(targetContext));finish(Activity.RESULT_OK,result);return}
             importDraft?.let{path->
                 val source=File(path).canonicalFile
                 check(source.parentFile==targetContext.cacheDir.canonicalFile)
@@ -28,9 +30,11 @@ class SmokeInstrumentation:Instrumentation() {
             val directory=File(targetContext.cacheDir,"synthetic-check-${java.util.UUID.randomUUID()}").apply{check(mkdirs())}
             val isolated=object:ContextWrapper(targetContext){override fun getFilesDir()=directory}
             val store=ProfileStore(isolated)
-            check(store.profiles.size==18)
+            check(store.profiles.size==51)
             check(store.profiles.count{it.id=="eid-persosim03"}==1)
             check(store.profiles.count{it.signedFixture}==16)
+            check(store.profiles.count{it.passportCatalog}==33)
+            check(store.profiles.count{it.passportCatalog&&it.simulatable}==8)
             check(store.profiles.none{it.id.contains("gt",ignoreCase=true)})
             val settings=JSONObject(store.profiles.first{it.kind=="eid"}.json().toString())
             settings.getJSONObject("settings").put("pin_retries",2).put("puk_uses",7).put("transport_pin",true).put("pin","12345").put("eid_active",false)
@@ -47,8 +51,26 @@ class SmokeInstrumentation:Instrumentation() {
             val invalid=JSONObject(profile.json().toString()).put("id","../escape")
             check(runCatching{Profile.parse(invalid)}.isFailure)
             check(runCatching{store.importDraft(profile.json().toString())}.isFailure)
-            check(ProfileStore(isolated).profiles.size==18)
+            check(ProfileStore(isolated).profiles.size==51)
             profile.name=original;store.save()
+            val migration=File(directory,"migration").apply{check(mkdirs())}
+            val migrationContext=object:ContextWrapper(targetContext){override fun getFilesDir()=migration}
+            val canonical=NativeCore.call(JSONObject().put("op","passport_catalog")).getJSONArray("profiles").getJSONObject(0)
+            val conflicting=Profile.parse(canonical).apply{name="Eigener Namenskonflikt";groups=JSONObject(groups.toString()).put("DG11","synthetic-own-data")}
+            File(migration,"profile-drafts.json").writeText(org.json.JSONArray().put(conflicting.json()).toString())
+            val migrated=ProfileStore(migrationContext)
+            val preserved=migrated.profiles.single{it.name=="Eigener Namenskonflikt"}
+            check(preserved.id.startsWith("own-")&&!preserved.passportCatalog&&preserved.groups.getString("DG11")=="synthetic-own-data")
+            check(migrated.profiles.count{it.passportCatalog}==33&&migrated.ownCount()==1)
+            check(ProfileStore(migrationContext).profiles.single{it.name=="Eigener Namenskonflikt"}.id==preserved.id)
+            val crowded=File(directory,"crowded").apply{check(mkdirs())}
+            val crowdedContext=object:ContextWrapper(targetContext){override fun getFilesDir()=crowded}
+            val ownDrafts=org.json.JSONArray()
+            repeat(100){index->ownDrafts.put(Profile.defaults().getJSONObject(1).put("id","old-$index"))}
+            File(crowded,"profile-drafts.json").writeText(ownDrafts.toString())
+            val full=ProfileStore(crowdedContext)
+            check(full.ownCount()==100&&full.profiles.count{it.passportCatalog}==33&&full.profiles.size==149)
+            check(runCatching{full.importDraft(Profile.defaults().getJSONObject(1).put("id","over-limit").toString())}.isFailure)
             val challenge=ByteArray(48).also{java.security.SecureRandom().nextBytes(it)}
             val proof=LicenseKey.prove(targetContext,challenge)
             val publicKey=KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(proof.publicKey))

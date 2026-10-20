@@ -18,9 +18,11 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   await screen.getByText('Erika Mustermann', { exact: true }).tap();
   await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
   await screen.getByText('Datengruppen', { exact: true }).tap();
-  await expect(screen.getByText('DG2', { exact: true })).toBeVisible();
+  await expect(screen.getByText(/Familienname: MUSTERMANN/)).toBeVisible();
   await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('editor'));
+  await screen.swipe({direction:'down'});
+  await expect(screen.getByText('DG2', { exact: true })).toBeVisible();
   await screen.getByTestId('nav-Simulation').getByText('Simulation', { exact: true }).tap();
   await expect(screen.getByText('Lokal auf diesem Smartphone', { exact: true })).not.toBeVisible();
   await expect(screen.getByText('NFC-Kompatibilität geräteabhängig', { exact: true })).not.toBeVisible();

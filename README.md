@@ -3,7 +3,8 @@
 Kotlin/Jetpack Compose Android frontend for local ePassport and eID simulation. The original app
 code is **Apache-2.0**; the Phoenix cores are separate and excluded (see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). PQC is reserved at the same
-adapter boundary, not advertised as a working mode. Cloud is planned only.
+adapter boundary, not advertised as a working mode. Cloud profile simulation remains planned.
+Optional QR device registration, status and disconnect use the existing Phoenix HTTPS origins.
 
 ## Contract
 
@@ -19,16 +20,22 @@ adapter boundary, not advertised as a working mode. Cloud is planned only.
 - NFC APDUs execute locally through the unchanged core implementation; no
   substitute protocol engine and no cloud fallback.
 - Android, local and Vercel must use the same source revisions. Target binaries differ.
-  `components.lock.json` records the Android revisions. Existing local/Vercel drift
-  still needs reconciliation; this development build does not establish parity.
+  `components.lock.json` records the aligned shared-core revisions. The common
+  passport catalogue is pinned separately in `passport-catalog.lock.json`; deployed
+  cloud binaries are not attested by local source checks.
 - Cores remain private build inputs. No secrets, personal profiles or binaries in Git.
 
 The app includes 16 signed PersoSim fixtures (01–11 and UB01–UB05), without
 GlobalTester. Signed data stays immutable; editable copies use the local test PKI.
 The editor lists all supported eID DGs directly and exposes CAN, PIN, PUK and
 initial remaining counters. Transport-PIN (five digits) and deactivated eID are independent settings,
-implemented by the shared eID core. All three eID build pins are identical;
-remaining drift in other component dependencies is recorded separately.
+implemented by the shared eID core. The shared eID/ePassport/PQC/licensing build
+pins are aligned across Android, local and Vercel.
+
+The private shared catalogue supplies 33 unchanged original ePassport profiles.
+Eight passed native load checks; 25 remain visible with explicit unsupported
+reasons. Existing Android drafts remain available, with up to 100 own profiles
+independently of the bundled catalogue. See docs/profile-catalog-2026-10-21.md.
 
 ## Build
 

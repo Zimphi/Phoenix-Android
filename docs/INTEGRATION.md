@@ -7,15 +7,17 @@ cores and existing host. The open repository contains no core source or binaries
 A private native build uses the pinned simulator host and its recursive core
 checkout. Source revisions are recorded, not just marketing versions. Future PQC
 uses the same adapter, without a second Android-specific protocol implementation.
-Cloud settings are informational and send no requests.
+Cloud profile simulation remains informational. Optional QR PKI-device
+registration/status/disconnect sends signed HTTPS requests; see PkiDevice.kt.
 
 Platform work and remaining limits:
 - Android key identity, CLOCK_BOOTTIME and Android system TLS trust were added
   centrally to the same licensing SDK. Signature and authenticated time gates remain.
 - Authenticated NTS time is an existing network requirement of core licensing;
   local APDU processing does not mean guaranteed cold-start airplane-mode licensing.
-- Local and Vercel currently pin different commits despite matching version labels.
-  Parity must be established before claiming equivalence on all targets.
+- Android/local/Vercel shared-core source pins are aligned, with identical
+  registry dependency versions and catalogue hashes. This does not attest a live
+  cloud deployment; see core-parity-2026-10-20.md.
 - Physical full authentication passed on 2026-10-20 with a Samsung SM-S918B
   and REINER SCT cyberJack RFID basis. Both local clients first require an
   external SELECT AID to route Android HCE; their MF-first startup is not yet

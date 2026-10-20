@@ -17,6 +17,11 @@ Lucide icons are under ISC / MIT terms, with the full notice in `licenses/Lucide
 Source revision and vector conversion are recorded in `licenses/Lucide-source.txt`.
 Manrope font is under SIL Open Font License 1.1; see `licenses/Manrope.txt`.
 
+PKI QR scanning uses JourneyApps ZXing Android Embedded 4.3.0 and ZXing core,
+under Apache-2.0: https://github.com/journeyapps/zxing-android-embedded and
+https://github.com/zxing/zxing. Camera frames are decoded locally; this scanner
+does not use a remote QR-generation or QR-decoding service.
+
 PersoSim Profile01–11 and ProfileUB01–05: synthetic test data from
 https://github.com/PersoSim/de.persosim.simulator at
 2b04578928ae5a1b40189dabe87c4939cb69bdf1, GPL-3.0.

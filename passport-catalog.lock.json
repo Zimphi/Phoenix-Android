@@ -1,0 +1,10 @@
+{
+  "format": "phoenix-passport-catalog-v1",
+  "version": 1,
+  "repository": "Zimphi/Phoenix-ePassport-Core-Rust",
+  "commit": "5d4bcf14901eb8b1676dc9351acca5e0e887d939",
+  "path": "test-profiles/catalog.json",
+  "sha256": "806d164f942cbcbb7b1c604b01bb97d36d2dc44466e5120566bcd210c1fc26a1",
+  "profiles": 33,
+  "simulatable": 8
+}

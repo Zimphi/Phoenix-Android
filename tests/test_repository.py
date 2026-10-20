@@ -48,6 +48,19 @@ class RepositoryContract(unittest.TestCase):
             ['git', '-C', str(workspace / 'Phoenix-Simulator-Rust'), 'rev-parse', 'HEAD'],
             text=True).strip())
 
+    def test_passport_catalog_is_identical_across_platforms(self):
+        import hashlib
+        lock=json.loads((ROOT/'passport-catalog.lock.json').read_text())
+        for repository in ('Phoenix-Simulator-Rust','Phoenix-Vercel'):
+            path=ROOT.parent/repository/'passport-catalog.lock.json'
+            if path.exists():self.assertEqual(json.loads(path.read_text()),lock)
+        private=ROOT/'.private/epassport/test-profiles/catalog.json'
+        if private.exists():
+            self.assertEqual(hashlib.sha256(private.read_bytes()).hexdigest(),lock['sha256'])
+            catalog=json.loads(private.read_bytes())
+            self.assertEqual(len(catalog['profiles']),33)
+            self.assertEqual(sum(p['simulatable'] for p in catalog['profiles']),8)
+
     def test_shared_registry_dependencies_use_identical_locked_versions(self):
         def registry(path):
             result = {}

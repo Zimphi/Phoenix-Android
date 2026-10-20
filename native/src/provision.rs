@@ -60,6 +60,31 @@ fn eid_profile(groups:&BTreeMap<String,String>)->Result<EidProfile>{
     }
     profile.validate()?;Ok(profile)
 }
+pub fn describe(value:Value)->Result<Value>{
+    ensure!(serde_json::to_vec(&value)?.len()<=1024*1024,"Draft limit");
+    let draft:Draft=serde_json::from_value(value)?;
+    ensure!(draft.format=="phoenix-android-draft-v1","Unsupported draft");
+    if draft.kind=="eid" {
+        let profile=eid_profile(&draft.groups)?;
+        let mut groups=BTreeMap::new();
+        for (number,value) in profile.values {
+            if number==16 {continue;}
+            groups.insert(format!("DG{number}"),match value {Group::Text(text)=>text,other=>serde_json::to_string(&other)?});
+        }
+        Ok(json!({"groups":groups,"active":profile.active}))
+    }else{
+        ensure!(draft.kind=="epassport","Unsupported draft");
+        let mut groups=draft.groups;
+        if let Some(raw)=groups.get("DG1").filter(|v|!v.trim_start().starts_with('{')) {
+            let mrz=cav4_local_prototype::personalization::td3_mrz(&phoenix_eid_core::transport::unhex(raw)?)?;
+            let text=std::str::from_utf8(&mrz)?;
+            let names=text[5..44].split_once("<<").unwrap_or((&text[5..44],""));
+            let clean=|s:&str|s.replace('<'," ").trim().to_owned();
+            groups.insert("DG1".into(),json!({"surname":clean(names.0),"given_names":clean(names.1),"issuing_state":clean(&text[2..5]),"document_number":clean(&text[44..53]),"nationality":clean(&text[54..57]),"date_of_birth":&text[57..63],"sex":&text[64..65],"date_of_expiry":&text[65..71],"optional_data":clean(&text[72..86])}).to_string());
+        }
+        Ok(json!({"groups":groups}))
+    }
+}
 fn passport_groups(groups:&BTreeMap<String,String>)->Result<BTreeMap<String,String>> {
     let mut result=BTreeMap::new();
     for (name,value) in groups {
@@ -101,6 +126,17 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
     let draft:Draft=serde_json::from_value(value)?;
     ensure!(draft.format=="phoenix-android-draft-v1"&&["eid","epassport"].contains(&draft.kind.as_str()),"Unsupported draft");
     pki_admin::identifier(&draft.id)?;
+    if draft.kind=="epassport" {
+        if let Some(original)=phoenix_simulator::passport_catalog::entry(&draft.id)? {
+            ensure!(serde_json::to_value(&draft.groups)?==original["groups"],"Katalog-Datengruppen müssen unverändert bleiben");
+            for (name,value) in [("can",&draft.settings.can),("pin",&draft.settings.pin),("puk",&draft.settings.puk)] {
+                ensure!(value==original["profile"][name].as_str().unwrap_or(""),"Katalog-Zugangsdaten müssen unverändert bleiben");
+            }
+            ensure!(!draft.settings.transport_pin&&draft.settings.eid_active,"Ungültige ePassport-Einstellungen");
+            *application=None;native.close();
+            return native.mount_passport(&draft.id);
+        }
+    }
     ensure!(draft.settings.pin.len()==if draft.settings.transport_pin{5}else{6},"PIN-Länge passt nicht zum Transport-PIN-Modus");
     ensure!(draft.kind=="eid" || (!draft.settings.transport_pin && draft.settings.eid_active),"eID-Einstellungen sind nur für eID-Profile verfügbar");
     let signed=fixture(&draft.id);
@@ -170,6 +206,24 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
         for (a,b) in original.ca_keys.iter().zip(&adapted.ca_keys){assert!(a.private_scalar==b.private_scalar);assert_eq!(a.public_point,b.public_point);assert_eq!(a.key_id,b.key_id);assert_eq!(a.parameter_id,b.parameter_id);assert_eq!(a.privileged,b.privileged);}
         assert!(adapted.cvca_certificate.is_none());assert!(adapted.approximate_date.is_none());
         }
+    }
+    #[test] fn editor_description_uses_effective_core_values_without_mounting_a_card(){
+        let draft=json!({"format":"phoenix-android-draft-v1","id":"test","kind":"eid","name":"Test","groups":{"DG4":"MAX","DG5":"MUSTERMANN","DG8":"19900101"},"settings":{"can":"123456","pin":"123456","puk":"1234567890"}});
+        let result=describe(draft).unwrap();
+        assert_eq!(result["groups"]["DG1"],"ID");assert_eq!(result["groups"]["DG4"],"MAX");assert_eq!(result["groups"]["DG8"],"19900101");assert!(result["groups"].get("DG16").is_none());
+    }
+    #[test] fn catalogue_description_reads_original_mrz_and_rejects_modified_signed_groups(){
+        let all=phoenix_simulator::passport_catalog::drafts().unwrap();
+        let mut draft=all["profiles"].as_array().unwrap().iter().find(|p|p["id"]=="deutscher-reisepass-eac").unwrap().clone();
+        for field in ["catalog_sha256","simulatable","simulation_error"]{draft.as_object_mut().unwrap().remove(field);}
+        let original=draft["groups"].clone();
+        let result=describe(draft.clone()).unwrap();
+        let mrz:Value=serde_json::from_str(result["groups"]["DG1"].as_str().unwrap()).unwrap();
+        assert_eq!(mrz["surname"],"ADEYEMI");assert_eq!(mrz["given_names"],"LINA");
+        assert_eq!(draft["groups"],original);
+        draft["groups"]["DG1"]=json!("tampered");
+        let mut native=Native::new(Config::default());let mut application=None;
+        assert!(mount(&mut native,Path::new("unused"),draft,&mut application).unwrap_err().to_string().contains("unverändert"));
     }
     #[test] fn malformed_encoded_dg_and_mrz_fail_before_personalization(){assert!(passport_groups(&BTreeMap::from([("DG2".into(),"zz".into())])).is_err());assert!(passport_groups(&BTreeMap::from([("DG1".into(),"{}".into())])).is_err());}
     #[test] fn eid_values_use_the_original_core_validation(){assert!(eid_profile(&BTreeMap::from([("DG8".into(),"not-a-date".into())])).is_err());let profile=eid_profile(&BTreeMap::from([("DG4".into(),"MAX".into()),("DG5".into(),"MUSTERMANN".into())])).unwrap();assert_eq!(profile.values[&4],Group::Text("MAX".into()));}

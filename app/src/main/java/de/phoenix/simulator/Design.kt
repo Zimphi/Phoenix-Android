@@ -140,7 +140,7 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
 @Composable internal fun Navigation(active:String,onNavigate:(String)->Unit) {
     Column(Modifier.background(Color.White).navigationBarsPadding()) {
         HorizontalDivider(color=Border.copy(alpha=.45f))
-        Row(Modifier.fillMaxWidth().height(65.dp)) {
+        Row(Modifier.fillMaxWidth().height(75.dp).padding(top=10.dp)) {
             for(name in listOf("Profile","Simulation","Über")) {
                 val chosen=name==active
                 Column(Modifier.weight(1f).fillMaxHeight().testTag("nav-$name").semantics{selected=chosen}.clickable(role=Role.Tab,onClick={onNavigate(name)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {

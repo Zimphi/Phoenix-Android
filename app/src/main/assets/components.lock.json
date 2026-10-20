@@ -2,20 +2,20 @@
   "host": {
     "repository": "git@github.com:Zimphi/Phoenix-Simulator-Rust.git",
     "path": ".",
-    "commit": "8370fc7524aaac293c0101b1429610ab92f63f6b",
+    "commit": "8d3153a3fc85317a9aadd9eb0ba66dd9656fd1c7",
     "version": "0.13.5-rc.2"
   },
   "eid": {
     "repository": "git@github.com:Zimphi/Phoenix-eID-Core-Rust.git",
     "path": "components/eid",
-    "commit": "4c593ae1ea3f711d53b0252556d1903368d371c2",
+    "commit": "4406e71ab8da8e60c495639b81f693f003ea8573",
     "version": "0.1.7",
     "branch": "codex/common-platform-cores"
   },
   "epassport": {
     "repository": "git@github.com:Zimphi/Phoenix-ePassport-Core-Rust.git",
     "path": "components/eid/dependencies/epassport",
-    "commit": "75b9d6e629446b85148296bc0afa965bd61331a0",
+    "commit": "5d4bcf14901eb8b1676dc9351acca5e0e887d939",
     "version": "0.4.8",
     "branch": "codex/common-platform-cores"
   },

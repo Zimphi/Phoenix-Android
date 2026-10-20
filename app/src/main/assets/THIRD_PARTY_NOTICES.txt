@@ -23,3 +23,8 @@ revision 2b04578928ae5a1b40189dabe87c4939cb69bdf1, GPL-3.0.
 The derived persosim-profiles.json retains those terms (see licenses/GPL-3.0.txt).
 Signed security files and test CA keys stay in private local build inputs.
 The Apache-2.0 license for original application code remains unchanged.
+
+QR scanning uses zxing-android-embedded 4.3.0 and ZXing core under Apache-2.0:
+https://github.com/journeyapps/zxing-android-embedded
+https://github.com/zxing/zxing
+Camera frames are decoded locally.
