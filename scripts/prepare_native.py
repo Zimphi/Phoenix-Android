@@ -40,6 +40,8 @@ def prepare(workspace):
     link(private/'eid','dependencies/eid-reference',private/'eid-reference')
     link(private/'eid','dependencies/epassport',private/'epassport')
     link(private/'simulator','components/eid',private/'eid')
+    from prepare_test_fixture import prepare as prepare_fixture
+    prepare_fixture(workspace)
     print('Private source inputs prepared; card core source files remain unchanged.')
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('workspace',type=Path);args=parser.parse_args();prepare(args.workspace.resolve())

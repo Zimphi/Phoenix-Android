@@ -28,14 +28,15 @@ class SmokeInstrumentation:Instrumentation() {
             val directory=File(targetContext.cacheDir,"synthetic-check-${java.util.UUID.randomUUID()}").apply{check(mkdirs())}
             val isolated=object:ContextWrapper(targetContext){override fun getFilesDir()=directory}
             val store=ProfileStore(isolated)
-            check(store.profiles.size==2)
+            check(store.profiles.size==3)
+            check(store.profiles.count{it.id=="eid-persosim03"}==1)
             val profile=store.profiles.first();val original=profile.name
             profile.name="Gespeichertes Testprofil";store.save()
             check(ProfileStore(isolated).profiles.first().name=="Gespeichertes Testprofil")
             val invalid=JSONObject(profile.json().toString()).put("id","../escape")
             check(runCatching{Profile.parse(invalid)}.isFailure)
             check(runCatching{store.importDraft(profile.json().toString())}.isFailure)
-            check(ProfileStore(isolated).profiles.size==2)
+            check(ProfileStore(isolated).profiles.size==3)
             profile.name=original;store.save()
             val challenge=ByteArray(48).also{java.security.SecureRandom().nextBytes(it)}
             val proof=LicenseKey.prove(targetContext,challenge)

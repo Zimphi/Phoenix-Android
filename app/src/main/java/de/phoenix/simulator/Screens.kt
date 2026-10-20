@@ -58,7 +58,7 @@ import org.json.JSONObject
                     Box(Modifier.size(52.dp).background(if(kind=="eid")Color(0xffe9efdf)else Color(0xffe5eaff),RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center){if(kind=="epassport")Art(kind,Modifier.size(46.dp).offset(x=(-4).dp))else Glyph(kind,Color(0xff4c6631),Modifier.size(27.dp))}
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                         Text(profile.name,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text("$label · Testprofil",fontSize=12.sp,color=Muted)
+                        Text(if(profile.id=="eid-persosim03")"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
                     }
                     Glyph("chevron",Muted,Modifier.size(20.dp))
                 }
@@ -136,7 +136,7 @@ import org.json.JSONObject
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
         Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {
             Text(profile.name,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy)
-            Text("${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
+            Text(if(profile.id=="eid-persosim03")"eID · Signiertes PersoSim-Profil" else "${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
         }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Pale).padding(3.dp)) {
             listOf("Einstellungen","Datengruppen").forEachIndexed { index,label ->

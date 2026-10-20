@@ -64,3 +64,38 @@ keys, copies and client traces outside Git in a private directory.
 
 This is physical functional evidence, not a certification or exhaustive
 interoperability result. Online PAOS and PQC were not part of this check.
+
+
+### Additional PersoSim test card
+
+`eid-persosim03` is installed once without replacing existing drafts. Its signed
+synthetic identity is immutable; custom eID drafts retain their own local test PKI.
+PersoSim data and CA keys are taken from Profile03 at upstream commit
+`2b04578928ae5a1b40189dabe87c4939cb69bdf1`.
+`python3 scripts/prepare_test_fixture.py /path/to/ePassport` pins the original XML,
+extracts no secret from a real document, and stages ignored private build inputs.
+Only the unsigned obsolete CVCA/date administration nodes are removed: the app
+pins current Governikus `DETESTeID00009` separately and uses current card time.
+A native regression compares every signed file, DG and CA key with the original.
+The external BSI Test-CSCA09 public certificate is pinned independently by SHA-256.
+No protocol-core source is changed. The preset uses the existing validated
+`PersonalizedProfile::load -> into_card -> application` API because the generic
+host's additional PA report expects newly generated SecurityInfos. Validation,
+licensing, TA authorization and secure messaging remain in the same eID core.
+The opt-in `check_eid_test_profile` example checks import, rejection of modified
+signed DGs and eID selection using an isolated copy of synthetic app state.
+Do not infer successful official self-disclosure from this local check; that
+requires a separate AusweisApp run against the physical NFC reader.
+
+
+Hardware verification on 2026-10-20, Galaxy S23 Ultra + REINER SCT cyberJack RFID
+basis, official AusweisApp test self-disclosure: PACE, terminal certificate chain,
+TA and CA (AES-128, key 41) completed. The service then sent a batch containing
+RI and DG reads. RI returned protected 6982 (effective requested CHAT has no RI
+right), DG1–10/13/17 returned protected data, absent DG19 returned protected 6A82.
+The remote service ended with `Paos_Error_AL_Internal_Error: Cannot decrypt
+ResponseAPDU`. An independent Python cryptography check derived the CA session
+from the public synthetic test key and recorded EAC2 nonce/public key: all 17
+responses had valid AES-CMAC, all encrypted data had valid ISO7816 padding.
+This is NOT a passed official self-disclosure. No RI authorization was broadened,
+no failed PA/SM check bypassed, and no core source modified to conceal the result.

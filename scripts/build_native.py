@@ -23,6 +23,8 @@ def environment(ndk, current):
     return env
 
 def build(ndk,check):
+    from prepare_test_fixture import verify
+    verify()
     locations={'host':'simulator','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
     for name,entry in json.loads((ROOT/'components.lock.json').read_text()).items():
         source=ROOT/'.private'/locations[name]

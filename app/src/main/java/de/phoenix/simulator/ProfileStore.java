@@ -17,6 +17,13 @@ final class ProfileStore {
             try(InputStream input=file.openRead()) { list=new JSONArray(read(input)); }
         } else list=Profile.defaults();
         for(int i=0;i<list.length();i++) profiles.add(Profile.parse(list.getJSONObject(i)));
+        boolean present=false;
+        for(Profile profile:profiles) if(profile.id.equals("eid-persosim03")) present=true;
+        if(!present && profiles.size()<100) {
+            try(InputStream input=context.getAssets().open("persosim03-draft.json")) {
+                importDraft(read(input));
+            }
+        }
     }
     static String read(InputStream input) throws IOException {
         if(input==null) throw new IOException("Datei nicht lesbar");

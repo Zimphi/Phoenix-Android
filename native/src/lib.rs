@@ -10,7 +10,7 @@ use zeroize::Zeroizing;
 mod activation;
 mod provision;
 static ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
-static RUNTIME: OnceLock<Mutex<Native>> = OnceLock::new();
+static RUNTIME: OnceLock<Mutex<(Native,Option<phoenix_eid_core::application::Application>)>> = OnceLock::new();
 #[derive(Deserialize)]
 #[serde(tag="op", rename_all="snake_case", deny_unknown_fields)]
 enum Request {
@@ -29,15 +29,23 @@ fn dispatch(request: &str) -> Result<Value> {
     ensure!(request.len() <= 32*1024*1024,"Request size limit");
     let request:Request=serde_json::from_str(request)?;
     let mut native=RUNTIME.get().context("Native Laufzeit nicht initialisiert")?.lock().map_err(|_|anyhow::anyhow!("Core-Zustand nicht verfügbar"))?;
+    let (native,application)=&mut *native;
     match request {
         Request::TrialPrepare => activation::prepare(ROOT.get().context("App root missing")?),
         Request::TrialReceive {delivery} => activation::receive(ROOT.get().context("App root missing")?,delivery),
         Request::Inventory => Ok(json!({"eid":native.inventory()?,"epassport":native.passport_inventory()?})),
-        Request::MountDraft {draft} => provision::mount(&mut native,ROOT.get().context("App root missing")?,draft),
-        Request::Mount {kind,id} => { native.close();match kind.as_str(){"eid"=>native.mount(&id),"epassport"=>native.mount_passport(&id),_=>anyhow::bail!("Core nicht verfügbar")}},
-        Request::Apdu {command} => native.apdu(&command),
-        Request::Reset => native.reset(),
-        Request::Close => Ok(native.close()),
+        Request::MountDraft {draft} => provision::mount(native,ROOT.get().context("App root missing")?,draft,application),
+        Request::Mount {kind,id} => { *application=None;native.close();match kind.as_str(){"eid"=>native.mount(&id),"epassport"=>native.mount_passport(&id),_=>anyhow::bail!("Core nicht verfügbar")}},
+        Request::Apdu {command} => if let Some(card)=application.as_mut(){
+            ensure!(command.len()<=phoenix_eid_core::transport::MAX_APDU*2+4096,"APDU zu groß");
+            let result=card.transmit(&phoenix_eid_core::transport::unhex(&command)?);
+            match result {Ok(response)=>Ok(json!({"response":phoenix_simulator::runtime::hex(&response)})),Err(error)=>{*application=None;Err(error)}}
+        }else{native.apdu(&command)},
+        Request::Reset => if let Some(card)=application.as_mut(){
+            if let Err(error)=card.reset(){*application=None;return Err(error)}
+            Ok(json!({"connected":true}))
+        }else{native.reset()},
+        Request::Close => {*application=None;Ok(native.close())},
         Request::EidEditor {request} => native.manage_profile(serde_json::from_value(request)?),
         Request::PassportEditor {request} => native.manage_passport_profile(serde_json::from_value(request)?),
     }
@@ -81,7 +89,7 @@ pub extern "system" fn Java_de_phoenix_simulator_NativeCore_initializeNative(mut
         ensure!(secret.len()==32,"Ungültiger lokaler Profilschlüssel");
         ROOT.set(root.to_path_buf()).map_err(|_|anyhow::anyhow!("App context already initialized"))?;
         let config=Config {data:root.join("runtime"),profiles:root.join("profiles/eid"),passport_profiles:root.join("profiles/epassport"),passphrase:secret,..Config::default()};
-        if RUNTIME.set(Mutex::new(Native::new(config))).is_err(){anyhow::bail!("Native Laufzeit bereits initialisiert")}
+        if RUNTIME.set(Mutex::new((Native::new(config),None))).is_err(){anyhow::bail!("Native Laufzeit bereits initialisiert")}
         Ok(json!({"initialized":true}))
     })
 }

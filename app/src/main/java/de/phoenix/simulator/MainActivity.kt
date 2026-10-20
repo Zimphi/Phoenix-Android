@@ -128,7 +128,7 @@ class MainActivity:ComponentActivity() {
                         val value=name.trim()
                         if(value.isEmpty()||value.length>120)message="Profilname muss 1 bis 120 Zeichen enthalten"
                         else {val old=profile.name;profile.name=value;runCatching{store.save()}.onSuccess{revision++;Toast.makeText(context,"Profilentwurf gespeichert",Toast.LENGTH_SHORT).show()}.onFailure{profile.name=old;message=it.message}}
-                    },{group->if(group.isEmpty())choosingGroup=true else editing=group})}
+                    },{group->if(profile.id=="eid-persosim03")message="Signiertes PersoSim-Testprofil: Datengruppen sind unveränderlich. Eigene Daten bitte in einem separaten Profil bearbeiten." else if(group.isEmpty())choosingGroup=true else editing=group})}
                     "Über"->About(components){clipboard.setText(androidx.compose.ui.text.AnnotatedString("Phoenix Android ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n$components"));Toast.makeText(context,"Versionsinfos kopiert",Toast.LENGTH_SHORT).show()}
                     "Einstellungen"->Settings{legal=it}
                     "Simulation"->Simulation(selected,status,::startSimulation,{
