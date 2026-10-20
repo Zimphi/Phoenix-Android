@@ -51,3 +51,8 @@ For the physical REINER SCT check, keep the phone unlocked on the reader and run
 sources are copied. It checks application selection, PACE, a protected synthetic
 DG1 (passport) or CardAccess read (eID), and an actual `6985` response after stop.
 Transport failures remain failures. It does not perform full CA/PA/TA conformance.
+
+The full physical authentication test uses the existing local eID Client and
+IS Terminal: `PHOENIX_AUTH_MATERIAL=/private/test-directory npm run test:e2e:native
+-- --grep 'full authentication'`. Preparation, verified profiles and the required
+Android AID preselection are documented in [INTEGRATION.md](docs/INTEGRATION.md).

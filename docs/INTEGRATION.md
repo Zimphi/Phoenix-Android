@@ -16,12 +16,11 @@ Platform work and remaining limits:
   local APDU processing does not mean guaranteed cold-start airplane-mode licensing.
 - Local and Vercel currently pin different commits despite matching version labels.
   Parity must be established before claiming equivalence on all targets.
-- A physical REINER SCT cyberJack RFID basis / Samsung SM-S918B check on
-  2026-10-20 passed passport application selection, CardAccess, CAN PACE and a
-  secure-messaging DG1 read matching the synthetic Erika profile. A stopped
-  session returned `6985`. Subsequent attempts lost RF contact (`80100016`,
-  then no card `8010000C`); eID RF and full CA/PA/TA remain unverified.
-  ADB/UI tests alone do not prove RF interoperability.
+- Physical full authentication passed on 2026-10-20 with a Samsung SM-S918B
+  and REINER SCT cyberJack RFID basis. Both local clients first require an
+  external SELECT AID to route Android HCE; their MF-first startup is not yet
+  sufficient on its own. See the test evidence below.
+
 
 ## Agreed activation direction
 
@@ -33,3 +32,35 @@ signs a random native challenge for device identity. Native code verifies posses
 the relay does not verify hardware attestation, so remote hardware provenance is
 not claimed. Profile data stay local. The trial relay transport uses HTTPS and
 passes its signed delivery to the unchanged shared verifier; no local grant is minted.
+
+## Physical authentication evidence (2026-10-20)
+
+| Android profile | Existing local client | Verified physical workflow |
+| --- | --- | --- |
+| Max Mustermann (eID) | Phoenix eID Client 0.2.0-dev, disclosure bridge | PACE → TA → PA → CA; authorized DG4, DG5, DG8 read |
+| Erika EAC-Test (additional ePassport) | Phoenix IS Terminal, local CLI | PACE → CA → PA → TA; complete document authentic; DG1, DG2, protected DG3 and DG14 read |
+
+The original Erika passport profile only configures PACE and PA. A separate
+profile was generated through the unchanged, pinned native personalization API
+for the full EAC test. Original drafts and native profiles were retained.
+Matching terminal credentials derive from synthetic test CVCAs. CSCA/CVC checks,
+SOD signatures, DG hashes and card cryptographic authentication stayed enabled.
+No card protocol or licensing check was replaced. The test harness holds a
+physical PC/SC connection and selects the relevant AID before starting the local
+client; all subsequent authentication runs in that client.
+
+TesterArmy drives selection/start/stop on the phone. To repeat with the private
+fixture directory, use `PHOENIX_AUTH_MATERIAL=/private/test-directory npm run
+test:e2e:native -- --grep 'full authentication'`. The example
+`native/examples/full_auth_material.rs` prepares a fresh, private copy of Android
+synthetic PKI/profile data; it needs `phone.tar`, `profile-passphrase`,
+`runtime/pki`, the original `profiles`, a random ASCII `terminal-password`, and
+`synthetic-dg3.bin` from the existing synthetic DG3 builder. Then run
+`tests/device/configure_local_terminals.py DIRECTORY` with the sibling Python
+runtime to verify CVC chains and configure both clients. Only the additional
+native passport profile is transferred; its draft is imported through the
+instrumentation's existing validated ProfileStore import. Keep all generated
+keys, copies and client traces outside Git in a private directory.
+
+This is physical functional evidence, not a certification or exhaustive
+interoperability result. Online PAOS and PQC were not part of this check.

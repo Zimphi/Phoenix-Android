@@ -10,13 +10,21 @@ import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 import org.json.JSONObject
 
-/** Device checks use their own draft store and never reset existing app data. */
+/** Smoke checks use an isolated store; explicit imports preserve existing drafts. */
 class SmokeInstrumentation:Instrumentation() {
     private var activation=false
-    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";start()}
+    private var importDraft:String?=null
+    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";importDraft=arguments?.getString("importDraft");start()}
     override fun onStart(){
         val result=Bundle()
         try{
+            importDraft?.let{path->
+                val source=File(path).canonicalFile
+                check(source.parentFile==targetContext.cacheDir.canonicalFile)
+                val imported=ProfileStore(targetContext).importDraft(source.inputStream().use{ProfileStore.read(it)})
+                result.putString("stream","Imported separate synthetic test draft: ${imported.name}")
+                finish(Activity.RESULT_OK,result);return
+            }
             val directory=File(targetContext.cacheDir,"synthetic-check-${java.util.UUID.randomUUID()}").apply{check(mkdirs())}
             val isolated=object:ContextWrapper(targetContext){override fun getFilesDir()=directory}
             val store=ProfileStore(isolated)
