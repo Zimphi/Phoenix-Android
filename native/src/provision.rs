@@ -76,6 +76,14 @@ fn eid_profile(groups:&BTreeMap<String,String>)->Result<EidProfile>{
     }
     profile.validate()?;Ok(profile)
 }
+fn bsi_source(draft:&Draft,profile:&EidProfile)->Result<Option<String>> {
+    if draft.kind!="eid" {return Ok(None);}
+    let preferred=if fixture(&draft.id).is_some(){Some(draft.id.as_str())}else{draft.persosim_source.as_deref()};
+    let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json"))?;
+    Ok(catalog.into_iter().find(|candidate|
+        preferred.is_none_or(|id|candidate.id==id)&&eid_profile(&candidate.groups).is_ok_and(|original|original.values==profile.values)
+    ).map(|candidate|candidate.id))
+}
 fn profile_changed(before:&EidProfile,after:&EidProfile)->Result<bool> {
     if before.active!=after.active{return Ok(true);}
     for number in &after.active {if before.encode(*number)?!=after.encode(*number)?{return Ok(true);}}
@@ -115,12 +123,13 @@ pub fn describe(value:Value)->Result<Value>{
     if draft.kind=="eid" {
         let profile=eid_profile(&draft.groups)?;
         let community=community_check(&profile);
+        let bsi_source=bsi_source(&draft,&profile)?;
         let mut groups=BTreeMap::new();
         for (number,value) in profile.values {
             if number==16 {continue;}
             groups.insert(format!("DG{number}"),match value {Group::Text(text)=>text,other=>serde_json::to_string(&other)?});
         }
-        Ok(json!({"groups":groups,"active":profile.active,"community":community}))
+        Ok(json!({"groups":groups,"active":profile.active,"community":community,"bsi_source":bsi_source}))
     }else{
         ensure!(draft.kind=="epassport","Unsupported draft");
         let mut groups=draft.groups;
@@ -270,15 +279,9 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
     }
     ensure!(draft.settings.pin.len()==if draft.settings.transport_pin{5}else{6},"PIN-Länge passt nicht zum Transport-PIN-Modus");
     ensure!(draft.kind=="eid" || (!draft.settings.transport_pin && draft.settings.eid_active),"eID-Einstellungen sind nur für eID-Profile verfügbar");
-    let mut source_id=draft.id.clone();
-    if draft.pki_infrastructure.as_deref()==Some("bsi")&&fixture(&source_id).is_none(){
-        if let Some(source)=&draft.persosim_source{ensure!(fixture(source).is_some(),"Unknown PersoSim source");source_id=source.clone();}
-    }
-    if draft.pki_infrastructure.as_deref()==Some("bsi")&&fixture(&source_id).is_none(){
-        let source=eid_profile(&draft.groups)?;
-        let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json"))?;
-        source_id=catalog.into_iter().find(|p|eid_profile(&p.groups).is_ok_and(|candidate|candidate.values==source.values)).context("PersoSim-Testsignaturen passen nicht zu diesen Datengruppen; ursprüngliche Personalisierungsdaten verwenden")?.id;
-    }
+    let source_id=if draft.pki_infrastructure.as_deref()==Some("bsi") {
+        bsi_source(&draft,&eid_profile(&draft.groups)?)?.context("PersoSim-Testsignaturen passen nicht zu diesen Datengruppen; ursprüngliche Personalisierungsdaten verwenden")?
+    }else{draft.id.clone()};
     let signed=fixture(&source_id);
     if signed.is_some() {
         let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json"))?;
@@ -366,6 +369,17 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn bsi_compatibility_requires_unchanged_signed_personalization() {
+        let mut catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json")).unwrap();
+        let mut draft=catalog.remove(0);
+        let source=draft.id.clone();
+        draft.id="own-copy".into();
+        draft.persosim_source=None;
+        assert_eq!(bsi_source(&draft,&eid_profile(&draft.groups).unwrap()).unwrap(),Some(source));
+        draft.groups.insert("DG5".into(),"EIGENER NACHNAME".into());
+        assert!(bsi_source(&draft,&eid_profile(&draft.groups).unwrap()).unwrap().is_none());
+
+    }
     #[test] fn supplementary_page_uses_dg11_without_inventing_values() {
         let mut groups=BTreeMap::new();
         assert_eq!(passport_supplementary(&groups),json!({"residence":"","title":""}));

@@ -79,6 +79,11 @@ final class Profile {
         try {return raw.trim().startsWith("{")?new JSONObject(raw).optString("Text",""):raw;}
         catch(JSONException error){return "";}
     }
+    boolean expired() {
+        if(!kind.equals("eid"))return false;
+        try {return java.time.LocalDate.parse(groupText("DG3"),java.time.format.DateTimeFormatter.BASIC_ISO_DATE).isBefore(java.time.LocalDate.now());}
+        catch(java.time.DateTimeException ignored){return false;}
+    }
     void updateName() {
         if(kind.equals("eid")) {String surname=groupText("DG5").trim();name=surname.isEmpty()?"eID-Profil":surname.substring(0,Math.min(surname.length(),120));}
     }

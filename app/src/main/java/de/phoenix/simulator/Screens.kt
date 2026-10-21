@@ -69,7 +69,7 @@ import org.json.JSONObject
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                         Text(profile.name,modifier=if(profile.persosimSource.isNotEmpty())Modifier.testTag("profile-source-${profile.persosimSource}")else Modifier,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
                         if(profile.kind=="eid")Text(listOf(profile.groupText("DG4"),"Seriennummer ${profile.documentNumber}").filter{it.isNotBlank()}.joinToString(" · "),fontSize=11.sp,color=Muted,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(if(!profile.simulatable)"$label · Nicht simulierbar" else if(profile.signedFixture)"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
+                        Text(if(!profile.simulatable)"$label · Nicht simulierbar" else if(profile.expired())"$label · Abgelaufen · Negativtest" else if(profile.signedFixture)"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
                     }
                     Glyph("chevron",Muted,Modifier.size(20.dp))
                 }
@@ -171,6 +171,7 @@ import org.json.JSONObject
     }
     val valid=profile.passportCatalog||(can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex(if(transport)"[0-9]{5}" else "[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10)
     val save={onSave(profile.name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))}
+    var bsiCompatible by remember(profile){mutableStateOf(profile.signedFixture)}
     var displayedGroups by remember(profile){mutableStateOf(profile.groups)}
     var displayedMrz by remember(profile){mutableStateOf("")}
     var displayedPassportDetails by remember(profile){mutableStateOf(JSONObject())}
@@ -182,6 +183,7 @@ import org.json.JSONObject
             description to image
         }.getOrNull()}
         val description=result?.first
+        bsiCompatible=description?.optString("bsi_source")?.let{it.isNotBlank()&&it!="null"}?:false
         displayedGroups=description?.optJSONObject("groups")?:profile.groups
         displayedMrz=description?.optString("mrz")?:""
         displayedPassportDetails=description?.optJSONObject("supplementary")?:JSONObject()
@@ -206,6 +208,7 @@ import org.json.JSONObject
         }
         if(profile.kind=="eid") {
             val warnings=buildList {
+                if(profile.expired())add("Abgelaufenes Testdokument – Negativtest")
                 if(!eidActive)add("eID deaktiviert")
                 if(transport)add("Transport-PIN aktiv – persönliche PIN setzen")
                 if(retries.toIntOrNull()==0)add("PIN gesperrt")
@@ -286,7 +289,7 @@ import org.json.JSONObject
             }
             if(!groups) {
                 if(profile.kind=="eid")RiSettings(profile,onCoreState)
-                ProfilePkiOptions(profile.kind,profile.pkiInfrastructure,profile.signedFixture,cloudVerified,onPki)
+                ProfilePkiOptions(profile.kind,profile.pkiInfrastructure,bsiCompatible,cloudVerified,onPki)
                 ProfileSettingsSection("Personalisierung","gear","personalization-settings") {
                     Action("Personalisierungsdaten zurücksetzen",false,onClick={reset=true})
                     if(profile.signedFixture||profile.passportCatalog)Action("Bearbeitbare Kopie erstellen",false,onClick=onCopy)

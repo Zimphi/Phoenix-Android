@@ -2,13 +2,13 @@
   "host": {
     "repository": "git@github.com:Zimphi/Phoenix-Simulator-Rust.git",
     "path": ".",
-    "commit": "c8a220a77810990d890489bd55daca18c1b3c02b",
+    "commit": "8d9e1fa43832329e495b6af1d6f3834fb8f03a29",
     "version": "0.13.5-rc.2"
   },
   "eid": {
     "repository": "git@github.com:Zimphi/Phoenix-eID-Core-Rust.git",
     "path": "components/eid",
-    "commit": "13786b7335bc4c1beb2b5c8a72fdb51065e5b0e1",
+    "commit": "bebeef6d44a5f1cff9ccac77df59107357cd26e1",
     "version": "0.1.7",
     "branch": "codex/common-platform-cores"
   },

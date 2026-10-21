@@ -13,8 +13,8 @@ test('eID restores personalization and retains it after relaunch',{timeout:180_0
  await expect(screen.getByText('HAMBURG',{exact:true})).toBeVisible();
  await screen.getByText('Einstellungen',{exact:true}).tap();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('BSI-Testinfrastruktur',{exact:true}));
- await expect(screen.getByTestId('pki-bsi')).toBeEnabled();await expect(screen.getByTestId('pki-bsi')).not.toBeChecked();await screen.getByText('BSI-Testinfrastruktur',{exact:true}).tap();
- await expect(screen.getByTestId('pki-bsi')).toBeChecked();
+ await expect(screen.getByTestId('pki-bsi')).toBeDisabled();
+ await expect(screen.getByText('Geänderte Datengruppen · keine passende PersoSim-Signatur',{exact:true})).toBeVisible();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Eigene Testinfrastruktur',{exact:true}));
  await expect(screen.getByTestId('pki-own')).toBeDisabled();
  if(await screen.getByText('Erfolgreiche Cloud-Anbindung erforderlich',{exact:true}).isVisible())await expect(screen.getByTestId('pki-phoenix')).toBeDisabled();
