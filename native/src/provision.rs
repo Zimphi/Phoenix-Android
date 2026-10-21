@@ -203,7 +203,7 @@ fn profile_id(kind:&str,bytes:&[u8])->String{
 }
 #[derive(Deserialize,Serialize)]
 #[serde(deny_unknown_fields)]
-struct Binding {native_id:String, settings:Settings, generation:Option<String>}
+struct Binding {native_id:String, settings:Settings, generation:Option<String>, #[serde(default)] infrastructure:Option<String>, #[serde(default)] central:Option<String>}
 fn binding_path(root:&Path,id:&str)->std::path::PathBuf {
     root.join("draft-bindings").join(format!("{}.bin",profile_id("eid",id.as_bytes())))
 }
@@ -248,6 +248,16 @@ pub fn ri_update(root:&Path,id:&str,frozen:bool,regenerate:bool,keys:Option<Valu
     load_editor(root,&saved.native_id)?.update_editor_state(None,Some(frozen),keys.as_ref())?;
     editor_state(root,id)
 }
+fn restore_editor_state(root:&Path,id:&str,state:&Value,settings:&Settings)->Result<()> {
+    let credentials=CredentialState::new(settings.pin.as_bytes(),settings.can.as_bytes(),settings.puk.as_bytes(),b"<<<<<<<<<<<<<<<<<<<<<<<<",settings.pin_retries,settings.puk_uses,settings.eid_active,true)?;
+    load_editor(root,id)?.update_editor_state(Some(&credentials),None,None)?;
+    let ri=&state["ri"];
+    let read=|name:&str|->Result<Vec<u8>>{phoenix_eid_core::transport::unhex(ri[name].as_str().context("Missing preserved RI state")?)};
+    let keys=phoenix_eid_core::ri_personalization::RiKeys{ec_private:Zeroizing::new(read("ec_private")?),dh_private:Zeroizing::new(read("dh_private")?)};
+    keys.validate_public(&read("ec_public")?,&read("dh_public")?)?;
+    load_editor(root,id)?.import_ri(&keys,&read("policy")?)?;
+    Ok(())
+}
 pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<phoenix_eid_core::application::Application>)->Result<Value>{
     let bytes=serde_json::to_vec(&value)?;ensure!(bytes.len()<=1024*1024,"Draft limit");
     let mut legacy=value.clone();
@@ -289,14 +299,25 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
         ensure!(draft.kind=="eid"&&eid_profile(&draft.groups)?.values==eid_profile(&original.groups)?.values,"Signierte PersoSim-Datengruppen müssen unverändert bleiben; für eigene Daten ein separates Profil verwenden");
     }
     let previous=if draft.kind=="eid"{binding(root,&draft.id)?}else{None};
+    // Older bindings reused a local CVCA when switching to signed PersoSim data.
+    let rebind=if let Some(saved)=&previous {
+        let path=config(root)?.profiles.join(&saved.native_id);
+        let info=phoenix_eid_core::profile_info::ProfilePkiInfo::load(&path)?;
+        if signed.is_some() {
+            let cvca=std::fs::read(path.join("eID/EF.CVCA"))?;
+            let fields=phoenix_eid_core::ber::parse(&cvca)?;
+            !fields.first().is_some_and(|field|field.0==0x42&&field.1.starts_with(b"DETESTeID"))
+        }else{info.document_pki_id.starts_with("persosim:")}
+    }else{false};
+    let preserved=if rebind {Some(load_editor(root,&previous.as_ref().unwrap().native_id)?.editor_state()?)}else{None};
     let tag=if signed.is_some(){"persosim"}else{&draft.kind};
     let legacy_id=profile_id(tag,&legacy_bytes);
     let original_id=profile_id(tag,&legacy_unselected);
-    let id=previous.as_ref().map(|b|b.native_id.clone()).unwrap_or_else(||{
+    let id=if rebind {profile_id("pki-rebind-v1",&bytes)}else{previous.as_ref().map(|b|b.native_id.clone()).unwrap_or_else(||{
         if draft.kind=="eid"&&root.join("profiles/eid").join(&legacy_id).is_dir(){legacy_id}
         else if fixture(&draft.id).is_some()&&root.join("profiles/eid").join(&original_id).is_dir(){original_id}
         else{profile_id(tag,&bytes)}
-    });pki_admin::identifier(&id)?;
+    })};pki_admin::identifier(&id)?;
     *application=None;native.close();
     // Validate and encode before generating any local PKI or writing a profile.
     let eid=if draft.kind=="eid"{Some(eid_profile(&draft.groups)?)}else{None};
@@ -339,7 +360,13 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
                 load_editor(root,&id)?.import_ri(&keys,&read("policy")?)?;
             }
         }
-        save_binding(root,&draft.id,&Binding{native_id:id.clone(),settings:draft.settings.clone(),generation:draft.personalization_generation.clone()})?;
+        if let Some(state)=&preserved {
+            let settings:Settings=if previous.as_ref().is_some_and(|saved|saved.settings==draft.settings&&saved.generation==draft.personalization_generation) {
+                serde_json::from_value(state["settings"].clone())?
+            }else{draft.settings.clone()};
+            restore_editor_state(root,&id,state,&settings)?;
+        }
+        save_binding(root,&draft.id,&Binding{native_id:id.clone(),settings:draft.settings.clone(),generation:draft.personalization_generation.clone(),infrastructure:draft.pki_infrastructure.clone(),central:None})?;
             return native.mount(&id).context("Mount existing eID");
         }
         let label=format!("persosim:bsi-test:{}",signed.unwrap().0.trim_end_matches(".perso"));
@@ -355,7 +382,13 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
                 load_editor(root,&id)?.import_ri(&keys,&read("policy")?)?;
             }
         }
-        save_binding(root,&draft.id,&Binding{native_id:id.clone(),settings:draft.settings.clone(),generation:draft.personalization_generation.clone()})?;
+        if let Some(state)=&preserved {
+            let settings:Settings=if previous.as_ref().is_some_and(|saved|saved.settings==draft.settings&&saved.generation==draft.personalization_generation) {
+                serde_json::from_value(state["settings"].clone())?
+            }else{draft.settings.clone()};
+            restore_editor_state(root,&id,state,&settings)?;
+        }
+        save_binding(root,&draft.id,&Binding{native_id:id.clone(),settings:draft.settings.clone(),generation:draft.personalization_generation.clone(),infrastructure:draft.pki_infrastructure.clone(),central:None})?;
         // The existing PersoSim-aware loader validates the whole authentication unit before use.
         let profile=PersonalizedProfile::load(&config.profiles.join(&id),&config.passphrase,&config.trusted_cscas,chrono::Utc::now().timestamp(),&[])?;
         *application=Some(std::sync::Arc::new(profile.into_card()?).application()?);
@@ -410,6 +443,16 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
         let found=community_check(&profile);assert_eq!(found["expected"],"02761100000000");
         profile.values.insert(18,Group::Text(found["expected"].as_str().unwrap().into()));
         assert_eq!(community_check(&profile)["status"],"matching");
+    }
+    #[test] fn binding_metadata_remains_compatible_without_ignoring_unknown_fields() {
+        let mut value=json!({"native_id":"android_test","settings":{"can":"123456","pin":"123456","puk":"1234567890"},"generation":null});
+        let old:Binding=serde_json::from_value(value.clone()).unwrap();
+        assert!(old.infrastructure.is_none()&&old.central.is_none());
+        value["infrastructure"]=json!("bsi");value["central"]=Value::Null;
+        let current:Binding=serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(current.infrastructure.as_deref(),Some("bsi"));
+        value["unknown"]=json!(true);
+        assert!(serde_json::from_value::<Binding>(value).is_err());
     }
     #[test] fn draft_bindings_use_the_authenticated_ber_envelope() {
         let json=br#"{"native_id":"android_example","settings":{"pin":"12345"}}"#;

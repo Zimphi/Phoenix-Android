@@ -346,7 +346,21 @@ class SmokeInstrumentation:Instrumentation() {
                 result.putBoolean("ri_policy_persistence_and_import",true)
                 val fixtures=targetContext.assets.open("persosim-profiles.json").use{org.json.JSONArray(ProfileStore.read(it))}
                 val original=Profile.parse(fixtures.getJSONObject(0));original.signedFixture=true
-                val bsi=Profile.parse(original.editableCopy());bsi.pkiInfrastructure="bsi"
+                val bsi=Profile.parse(original.editableCopy());bsi.pkiInfrastructure="profile"
+                bsi.settings.put("pin","54321").put("transport_pin",true).put("pin_retries",1).put("puk_uses",0)
+                val local=NativeCore.call(JSONObject().put("op","mount_draft").put("draft",bsi.coreDraft()))
+                NativeCore.call(JSONObject().put("op","close"))
+                val beforePki=NativeCore.call(JSONObject().put("op","editor_state").put("id",bsi.id))
+                bsi.pkiInfrastructure="bsi"
+                val migrated=NativeCore.call(JSONObject().put("op","mount_draft").put("draft",bsi.coreDraft()))
+                check(migrated.getString("profile")!=local.getString("profile"))
+                NativeCore.call(JSONObject().put("op","close"))
+                val afterPki=NativeCore.call(JSONObject().put("op","editor_state").put("id",bsi.id))
+                check(beforePki.getJSONObject("settings").toString()==afterPki.getJSONObject("settings").toString())
+                check(beforePki.getJSONObject("ri").toString()==afterPki.getJSONObject("ri").toString())
+                val cvca=File(targetContext.filesDir,"native/profiles/eid/"+migrated.getString("profile")+"/eID/EF.CVCA").readBytes()
+                check(String(cvca,Charsets.ISO_8859_1).contains("DETESTeID"))
+                result.putBoolean("bsi_switch_preserves_pin_counters_and_ri",true)
                 NativeCore.call(JSONObject().put("op","mount_draft").put("draft",bsi.coreDraft()))
                 check(NativeCore.call(JSONObject().put("op","apdu").put("command","00a4040c09e80704007f00070302")).getString("response").endsWith("9000"))
                 bsi.groups.put("DG4","GEAENDERT")
