@@ -46,6 +46,13 @@ final class Profile {
     JSONObject json() throws JSONException {
         return new JSONObject().put("format","phoenix-android-draft-v1").put("id",id).put("kind",kind).put("name",name).put("groups",groups).put("settings",settings);
     }
+    JSONObject editableCopy() throws JSONException {
+        JSONObject copy=new JSONObject(json().toString());
+        copy.put("id",kind+"-copy-"+java.util.UUID.randomUUID());
+        copy.put("name",name.substring(0,Math.min(name.length(),110))+" · Kopie");
+        if(kind.equals("epassport"))copy.getJSONObject("settings").put("pin","123456").put("puk","1234567890");
+        return copy;
+    }
     String label() { return kind.equals("eid") ? "eID" : "ePassport"; }
     static JSONArray defaults() throws JSONException {
         JSONArray list=new JSONArray();

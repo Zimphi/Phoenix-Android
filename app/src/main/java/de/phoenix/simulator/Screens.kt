@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -20,7 +21,7 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.semantics.*
 import org.json.JSONObject
 
-@Composable internal fun ProfileList(profiles:List<Profile>,onSelect:(String)->Unit,onCreate:()->Unit) {
+@Composable internal fun ProfileList(profiles:List<Profile>,onSelect:(String)->Unit) {
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
             Text("Profile",fontSize=34.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-1.2).sp,color=Navy)
@@ -29,24 +30,22 @@ import org.json.JSONObject
         Text("Dokumenttyp auswählen",fontSize=13.sp,color=Muted,modifier=Modifier.padding(top=12.dp,bottom=2.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             listOf("epassport","eid").forEach { kind ->
-                val count=profiles.count{it.kind==kind}
-                Box(Modifier.fillMaxWidth().height(142.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(if(kind=="eid")listOf(Color(0xfff0f2ff),Color(0xffe6ebff))else listOf(Color(0xffe4eaff),Color(0xffd8e1ff)))).clickable{onSelect(kind)}) {
-                    if(kind=="eid")profiles.firstOrNull{it.kind==kind}?.let{DocumentPreview(it,modifier=Modifier.align(Alignment.CenterEnd).padding(end=12.dp).size(142.dp,90.dp),compact=true)}
-                    else Art(kind,Modifier.align(Alignment.CenterEnd).offset(x=12.dp,y=8.dp).size(160.dp))
+                DocumentTypeCard(kind,profiles.count{it.kind==kind}){onSelect(kind)}
+            }
+        }
+    }
+}
+
+@Composable private fun DocumentTypeCard(kind:String,count:Int,onSelect:()->Unit) {
+                Box(Modifier.fillMaxWidth().height(142.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(if(kind=="eid")listOf(Color(0xfff0f2ff),Color(0xffe6ebff))else listOf(Color(0xffe4eaff),Color(0xffd8e1ff)))).clickable(onClick=onSelect)) {
+                    Art(kind,Modifier.align(Alignment.CenterEnd).offset(x=12.dp,y=8.dp).size(160.dp))
                     Column(Modifier.fillMaxSize().padding(Inset),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                         Text(if(kind=="eid")"eID" else "ePassport",fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.8).sp,color=Navy)
                         Text(if(count==1)"1 Profil vorhanden" else "$count Profile vorhanden",fontSize=13.sp,fontWeight=FontWeight.SemiBold,color=Navy,modifier=Modifier.fillMaxWidth(.72f))
                         Spacer(Modifier.weight(1f))
-                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Text(if(count>0)"Profile verfügbar" else "Noch kein Profil",fontSize=10.sp,color=Muted,modifier=Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha=.35f)).border(1.dp,Color(0xffb8c8ef),RoundedCornerShape(6.dp)).padding(horizontal=9.dp,vertical=4.dp))
-                        }
                     }
                     if(kind!="eid")Glyph("chevron",Navy,Modifier.align(Alignment.CenterEnd).padding(end=14.dp).size(22.dp))
                 }
-            }
-        }
-        Action("Neues Profil",false,onClick=onCreate)
-    }
 }
 
 @Composable internal fun ProfileSelection(profiles:List<Profile>,kind:String,onSelect:(Profile)->Unit,onCreate:()->Unit) {
@@ -61,7 +60,7 @@ import org.json.JSONObject
             if(matching.isEmpty())Text("Noch kein $label-Profil vorhanden.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=24.dp))
             matching.forEach { profile ->
                 Row(Modifier.fillMaxWidth().clickable{onSelect(profile)}.padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                    DocumentPreview(profile,modifier=Modifier.size(78.dp,52.dp),compact=true)
+                    if(profile.kind=="epassport")Art("epassport",Modifier.size(60.dp,66.dp)) else DocumentPreview(profile,modifier=Modifier.size(78.dp,52.dp),compact=true)
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                         Text(profile.name,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(if(!profile.simulatable)"$label · Nicht simulierbar" else if(profile.signedFixture)"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
@@ -75,7 +74,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun About(components:JSONObject,onCopy:()->Unit) {
+@Composable internal fun About(components:JSONObject) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val logoHeight=(maxHeight-420.dp).coerceIn(64.dp,132.dp)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -103,7 +102,6 @@ import org.json.JSONObject
                 Text("Build ${BuildConfig.VERSION_CODE}",fontSize=10.sp,color=Muted)
             }
         }
-        Action("Versionsinfos kopieren",false,onClick=onCopy)
     }
     }
 }
@@ -111,18 +109,13 @@ import org.json.JSONObject
 @Composable internal fun Settings(onLegal:(String)->Unit,onReader:()->Unit,onPki:()->Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Text("Verbindungen",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Navy)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).clickable(onClick=onPki).padding(16.dp),verticalAlignment=Alignment.CenterVertically){
-            Text("Zentrale PKI",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=Navy,modifier=Modifier.weight(1f));Glyph("chevron",Muted,Modifier.size(20.dp))
-        }
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-            Glyph("cloud",Navy,Modifier.size(30.dp))
-            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text("Cloud-Anbindung",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=Navy,modifier=Modifier.weight(1f))
-                Text("Geplant",fontSize=10.sp,color=Blue,modifier=Modifier.background(Color(0xffdce2ff),RoundedCornerShape(12.dp)).padding(horizontal=11.dp,vertical=4.dp))
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).clickable(onClick=onPki).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            Glyph("cloud",Blue,Modifier.size(30.dp))
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                Text("Cloud-Anbindung",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=Navy)
+                Text("Benutzerkonto und zentrale PKI",fontSize=12.sp,color=Muted)
             }
-            Text("Noch nicht implementiert",fontSize=13.sp,color=Muted)
-            }
+            Glyph("chevron",Muted,Modifier.size(19.dp))
         }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).clickable(onClick=onReader).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
             Glyph("wifi",Blue,Modifier.size(30.dp))
@@ -146,8 +139,9 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onSave:(String,JSONObject)->Boolean,onCopy:()->Unit,onEditGroup:(String,String)->Unit,onSimulate:()->Unit) {
+@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onExport:()->Unit,onSave:(String,JSONObject)->Boolean,onCopy:()->Unit,onEditGroup:(String,String)->Unit,onSimulate:()->Unit) {
     var groups by remember(profile.id){mutableStateOf(true)}
+    var face by remember(profile.id){mutableStateOf(false)}
     var can by remember(profile.id){mutableStateOf(profile.settings.getString("can"))}
     var pin by remember(profile.id){mutableStateOf(profile.settings.getString("pin"))}
     var puk by remember(profile.id){mutableStateOf(profile.settings.getString("puk"))}
@@ -158,11 +152,14 @@ import org.json.JSONObject
     val valid=profile.passportCatalog||(can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex(if(transport)"[0-9]{5}" else "[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10)
     val save={onSave(profile.name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))}
     var displayedGroups by remember(profile.id){mutableStateOf(profile.groups)}
+    var displayedMrz by remember(profile.id){mutableStateOf("")}
     LaunchedEffect(profile.id,profile.groups.toString()) {
         val draft=profile.json()
-        displayedGroups=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){runCatching{
-            NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft)).getJSONObject("groups")
-        }.getOrDefault(profile.groups)}
+        val description=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){runCatching{
+            NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))
+        }.getOrNull()}
+        displayedGroups=description?.optJSONObject("groups")?:profile.groups
+        displayedMrz=description?.optString("mrz")?:""
     }
     LaunchedEffect(can,pin,puk,retries,uses,transport,eidActive) {
         if(valid&&!profile.passportCatalog) {
@@ -170,30 +167,29 @@ import org.json.JSONObject
             if(settings.toString()!=profile.settings.toString())onSave(profile.name,settings)
         }
     }
+    if(face)AlertDialog(onDismissRequest={face=false},title={Text("DG2 · Gesichtsbild")},text={PassportFace(profile)},confirmButton={TextButton({face=false}){Text("Schließen")}})
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-            Text(profile.name,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy)
+            Text(profile.name,fontSize=22.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,maxLines=1,overflow=TextOverflow.Ellipsis)
             Text(if(profile.passportCatalog)"ePassport · Originales Simulatorprofil" else if(profile.signedFixture)"eID · Signiertes PersoSim-Profil" else "${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
         }
         IconButton({if(profile.passportCatalog||save())onSimulate()},enabled=valid,modifier=Modifier.semantics{contentDescription="Profil in Simulation übernehmen"}){Glyph("play",Blue,Modifier.size(28.dp))}
         }
-        DocumentPreview(profile,displayedGroups,Modifier.fillMaxWidth().height(132.dp))
+        DocumentPreview(profile,displayedGroups,if(profile.kind=="epassport")Modifier.fillMaxWidth().aspectRatio(125f/88f)else Modifier.fillMaxWidth().aspectRatio(856f/540f),mrz=displayedMrz)
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Pale).padding(3.dp)) {
             listOf("Datengruppen","Einstellungen").forEachIndexed { index,label ->
                 val active=groups==(index==0)
                 Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if(active)Blue else Color.Transparent).clickable{groups=index==0}.padding(vertical=12.dp),contentAlignment=Alignment.Center) {Text(label,fontSize=12.sp,color=if(active)Color.White else Muted)}
             }
         }
-        if(groups)Action("Profil importieren",false,onClick=onImport)
         if(!profile.simulatable)Text("Nicht simulierbar: ${profile.simulationError}",fontSize=11.sp,color=MaterialTheme.colorScheme.error)
-        if(groups&&profile.signedFixture)Action("Bearbeitbare Kopie erstellen",false,onClick=onCopy)
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f).testTag("editor-fields").verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(groups) {
                 (if(profile.kind=="eid")(1..22).filter{it!=16}.map{"DG$it"} else profile.groups.keys().asSequence().sortedBy{it.removePrefix("DG").toInt()}.toList()).forEach { key ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp,Border,RoundedCornerShape(12.dp)).clickable{onEditGroup(key,displayedGroups.optString(key))}.padding(horizontal=15.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp,Border,RoundedCornerShape(12.dp)).clickable{if(profile.kind=="epassport"&&key=="DG2")face=true else onEditGroup(key,displayedGroups.optString(key))}.padding(horizontal=15.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Text(groupValue(profile.kind,key,displayedGroups.optString(key)),fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=12,overflow=TextOverflow.Ellipsis)
+                            Text(if(profile.kind=="epassport"&&key=="DG2")"Gesichtsbild ansehen" else groupValue(profile.kind,key,displayedGroups.optString(key)),fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=12,overflow=TextOverflow.Ellipsis)
                             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)) {
                                 Text(key,fontSize=10.sp,fontWeight=FontWeight.SemiBold,color=Blue,modifier=Modifier.background(Pale,RoundedCornerShape(4.dp)).padding(horizontal=5.dp,vertical=3.dp))
                                 Text(groupDescription(profile.kind,key),fontSize=11.sp,color=Muted)
@@ -227,6 +223,11 @@ import org.json.JSONObject
                     }
                     Text("Transport-PIN: 5 Ziffern, erst nach PIN-Änderung online nutzbar. Deaktivierte eID: PIN-Zugriff gesperrt; CAN-Verwaltung bleibt möglich.",fontSize=11.sp,color=Muted)
                 }
+            }
+            if(!groups) {
+                if(profile.signedFixture||profile.passportCatalog)Action("Bearbeitbare Kopie erstellen",false,onClick=onCopy)
+                Action("Profil importieren",false,onClick=onImport)
+                Action("Profil exportieren",false,enabled=valid,onClick=onExport)
             }
         }
         if(!groups&&!valid)Text("Bitte vollständige Zugangsdaten eingeben. Die letzte gültige Einstellung bleibt gespeichert.",fontSize=11.sp,color=MaterialTheme.colorScheme.error)
@@ -303,18 +304,16 @@ import org.json.JSONObject
     var kind by remember{mutableStateOf<String?>(null)}
     AlertDialog(onDismissRequest=onDismiss,title={Text(if(kind==null)"Dokumenttyp auswählen" else if(kind=="eid")"eID-Profil auswählen" else "ePassport-Profil auswählen")},text={
         Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                listOf("epassport" to "ePassport","eid" to "eID").forEach{(value,label)->
-                    FilterChip(selected=kind==value,onClick={kind=value},label={Text(label)},leadingIcon={if(value=="epassport")Art(value,Modifier.size(24.dp))else Glyph(value,Blue,Modifier.size(20.dp))})
-                }
-            }
+            if(kind==null) {
+                listOf("epassport","eid").forEach{value->DocumentTypeCard(value,profiles.count{it.kind==value}){kind=value}}
+            } else TextButton({kind=null}){Glyph("back",Blue);Spacer(Modifier.width(8.dp));Text("Dokumenttyp ändern")}
             kind?.let{selectedKind->
                 val matching=profiles.filter{it.kind==selectedKind}
                 Column(Modifier.heightIn(max=320.dp).verticalScroll(rememberScrollState())) {
                     if(matching.isEmpty())Text("Noch kein Profil vorhanden.",color=Muted)
                     matching.forEach{profile->
                         Row(Modifier.fillMaxWidth().clickable{onSelect(profile)}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                            if(profile.kind=="epassport")Art(profile.kind,Modifier.size(28.dp))else Glyph(profile.kind,Blue,Modifier.size(24.dp))
+                            if(profile.kind=="epassport")Art("epassport",Modifier.size(60.dp,66.dp)) else DocumentPreview(profile,modifier=Modifier.size(78.dp,52.dp),compact=true)
                             Column(Modifier.weight(1f)){Text(profile.name,color=Navy,fontWeight=FontWeight.SemiBold);if(!profile.simulatable)Text("Nicht simulierbar",fontSize=11.sp,color=Muted)}
                             Glyph("chevron",Muted,Modifier.size(18.dp))
                         }
@@ -327,14 +326,25 @@ import org.json.JSONObject
 }
 
 
-@Composable internal fun UserAccount(userId:String?,environment:String?,busy:Boolean,onLogout:()->Unit) {
-    Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+@Composable internal fun AccountIdentity(identity:JSONObject,environment:String?) {
+    Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        AccountAvatar(Modifier.size(96.dp))
+        val name=identity.optString("display_name").takeIf{it.isNotBlank()&&it!="null"}
+        val username=identity.optString("username").takeIf{it.isNotBlank()&&it!="null"}
+        val email=identity.optString("email").takeIf{it.isNotBlank()&&it!="null"}
+        Text(name?:username?:"Phoenix-Konto",fontSize=22.sp,fontWeight=FontWeight.Bold,color=Navy,textAlign=TextAlign.Center)
+        if(username!=null&&username!=name)Text(username,fontSize=15.sp,color=Navy,textAlign=TextAlign.Center)
+        if(email!=null)Text(email,fontSize=14.sp,color=Muted,textAlign=TextAlign.Center)
+        Text("Benutzerkennung",fontSize=12.sp,color=Muted)
+        androidx.compose.foundation.text.selection.SelectionContainer{Text(identity.optString("user_id").ifBlank{"Wird geladen …"},fontSize=12.sp,color=Navy,textAlign=TextAlign.Center)}
+        if(environment!=null)Text(if(environment=="preview")"Preview" else "Produktion",fontSize=12.sp,color=Muted)
+    }
+}
+
+@Composable internal fun UserAccount(identity:JSONObject,environment:String?,busy:Boolean,onLogout:()->Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(24.dp)) {
         Text("Benutzerübersicht",fontSize=25.sp,fontWeight=FontWeight.Bold,color=Navy)
-        Column(Modifier.fillMaxWidth().background(Pale,RoundedCornerShape(14.dp)).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text("Benutzerkennung",fontSize=12.sp,color=Muted)
-            androidx.compose.foundation.text.selection.SelectionContainer{Text(userId?:"Nicht angemeldet",fontSize=16.sp,fontWeight=FontWeight.Bold,color=Navy)}
-            if(environment!=null)Text(if(environment=="preview")"Preview" else "Produktion",fontSize=12.sp,color=Muted)
-        }
-        Action(if(busy)"Wird abgemeldet …" else "Abmelden",false,enabled=!busy&&userId!=null,onClick=onLogout)
+        AccountIdentity(identity,environment)
+        Action(if(busy)"Wird abgemeldet …" else "Abmelden",false,enabled=!busy&&identity.optString("user_id").isNotBlank(),onClick=onLogout)
     }
 }

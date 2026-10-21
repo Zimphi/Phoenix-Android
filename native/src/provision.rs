@@ -75,6 +75,10 @@ pub fn describe(value:Value)->Result<Value>{
     }else{
         ensure!(draft.kind=="epassport","Unsupported draft");
         let mut groups=draft.groups;
+        let mrz=if let Some(raw)=groups.get("DG1") {
+            let encoded=if raw.trim_start().starts_with('{'){cav4_local_prototype::personalization::form::mrz(&serde_json::from_str(raw)?)?}else{phoenix_eid_core::transport::unhex(raw)?};
+            String::from_utf8(cav4_local_prototype::personalization::td3_mrz(&encoded)?.to_vec())?
+        }else{String::new()};
         if let Some(raw)=groups.get("DG1").filter(|v|!v.trim_start().starts_with('{')) {
             let mrz=cav4_local_prototype::personalization::td3_mrz(&phoenix_eid_core::transport::unhex(raw)?)?;
             let text=std::str::from_utf8(&mrz)?;
@@ -82,7 +86,12 @@ pub fn describe(value:Value)->Result<Value>{
             let clean=|s:&str|s.replace('<'," ").trim().to_owned();
             groups.insert("DG1".into(),json!({"surname":clean(names.0),"given_names":clean(names.1),"issuing_state":clean(&text[2..5]),"document_number":clean(&text[44..53]),"nationality":clean(&text[54..57]),"date_of_birth":&text[57..63],"sex":&text[64..65],"date_of_expiry":&text[65..71],"optional_data":clean(&text[72..86])}).to_string());
         }
-        Ok(json!({"groups":groups}))
+        let portrait=match groups.get("DG2") {
+            Some(raw) if raw=="synthetic:erika"=>Some(include_bytes!("../../.private/simulator/GUI/assets/erika-mustermann-passfoto.jpg").to_vec()),
+            Some(raw)=>crate::passport_lds::parse_dg2(&phoenix_eid_core::transport::unhex(raw)?)?.into_iter().next().map(|face|face.image),
+            None=>None,
+        };
+        Ok(json!({"groups":groups,"mrz":mrz,"portrait":portrait.map(|bytes|openssl::base64::encode_block(&bytes))}))
     }
 }
 fn passport_groups(groups:&BTreeMap<String,String>)->Result<BTreeMap<String,String>> {
@@ -214,12 +223,15 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
     }
     #[test] fn catalogue_description_reads_original_mrz_and_rejects_modified_signed_groups(){
         let all=phoenix_simulator::passport_catalog::drafts().unwrap();
-        let mut draft=all["profiles"].as_array().unwrap().iter().find(|p|p["id"]=="deutscher-reisepass-eac").unwrap().clone();
+        let mut draft=all["profiles"].as_array().unwrap().iter().find(|p|p["id"]=="phoenix-deu-mara-linden").unwrap().clone();
         for field in ["catalog_sha256","simulatable","simulation_error"]{draft.as_object_mut().unwrap().remove(field);}
         let original=draft["groups"].clone();
         let result=describe(draft.clone()).unwrap();
         let mrz:Value=serde_json::from_str(result["groups"]["DG1"].as_str().unwrap()).unwrap();
-        assert_eq!(mrz["surname"],"ADEYEMI");assert_eq!(mrz["given_names"],"LINA");
+        assert_eq!(mrz["surname"],"LINDEN");assert_eq!(mrz["given_names"],"MARA");
+        let original_mrz=cav4_local_prototype::personalization::td3_mrz(&phoenix_eid_core::transport::unhex(draft["groups"]["DG1"].as_str().unwrap()).unwrap()).unwrap();
+        assert_eq!(result["mrz"].as_str().unwrap().as_bytes(),original_mrz);
+        assert_eq!(original_mrz.len(),88);
         assert_eq!(draft["groups"],original);
         draft["groups"]["DG1"]=json!("tampered");
         let mut native=Native::new(Config::default());let mut application=None;

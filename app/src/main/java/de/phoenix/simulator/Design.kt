@@ -46,9 +46,37 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
     Canvas(modifier.semantics { contentDescription="Phoenix Logo" }) {
         val source=IntOffset((image.width*.098).toInt(),(image.height*.163).toInt())
         val dimensions=IntSize((image.width*.293).toInt(),(image.height*.677).toInt())
-        val scale=minOf(size.width/dimensions.width,size.height/dimensions.height)
-        val dest=IntSize((dimensions.width*scale).toInt(),(dimensions.height*scale).toInt())
+        val factor=minOf(size.width/dimensions.width,size.height/dimensions.height)
+        val dest=IntSize((dimensions.width*factor).toInt(),(dimensions.height*factor).toInt())
         drawImage(image,source,dimensions,IntOffset(((size.width-dest.width)/2).toInt(),((size.height-dest.height)/2).toInt()),dest,filterQuality=FilterQuality.High)
+    }
+}
+
+@Composable internal fun AccountAvatar(modifier:Modifier=Modifier) {
+    Canvas(modifier.clip(androidx.compose.foundation.shape.CircleShape).semantics{contentDescription="Benutzeravatar"}){identityPortrait()}
+}
+
+@Composable internal fun Startup() {
+    Column(Modifier.fillMaxSize().background(Page).testTag("phoenix-startup"),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+        Brand(Modifier.size(210.dp,244.dp))
+        Spacer(Modifier.height(24.dp))
+        Text("Phoenix",color=Navy,fontSize=38.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-1).sp)
+        Spacer(Modifier.height(8.dp))
+        Text("eID & ePassport Simulator",color=Muted,fontSize=14.sp)
+    }
+}
+
+internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size.height) {
+    scale(width/100f,height/128f,pivot=Offset.Zero) {
+        drawRoundRect(Brush.verticalGradient(listOf(Color(0xffdce6e5),Color(0xffb8cbca))),size=Size(100f,128f),cornerRadius=CornerRadius(7f))
+        val silhouette=Color(0xff6f8080)
+        drawOval(silhouette,Offset(31f,20f),Size(38f,49f))
+        val shoulders=Path().apply {
+            moveTo(7f,128f);lineTo(11f,105f);cubicTo(14f,88f,34f,87f,39f,78f)
+            lineTo(39f,64f);lineTo(61f,64f);lineTo(61f,78f)
+            cubicTo(66f,87f,86f,88f,89f,105f);lineTo(93f,128f);close()
+        }
+        drawPath(shoulders,silhouette)
     }
 }
 
@@ -56,7 +84,7 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
     val resource=when(kind) {
         "Profile"->R.drawable.icon_house;"Simulation","play"->R.drawable.icon_play;"Über","info"->R.drawable.icon_info
         "layers"->R.drawable.icon_layers;"add"->R.drawable.icon_circle_plus;"back"->R.drawable.icon_arrow_left;"chevron"->R.drawable.icon_chevron_right
-        "edit"->R.drawable.icon_pencil;"import"->R.drawable.icon_file_input;"save"->R.drawable.icon_save;"cloud"->R.drawable.icon_cloud
+        "edit"->R.drawable.icon_pencil;"import"->R.drawable.icon_file_input;"export"->R.drawable.icon_file_output;"save"->R.drawable.icon_save;"cloud"->R.drawable.icon_cloud
         "privacy"->R.drawable.icon_shield_check;"legal"->R.drawable.icon_scale;"file"->R.drawable.icon_file_text;"eid"->R.drawable.icon_id_card
         "epassport"->R.drawable.icon_globe;"phone"->R.drawable.icon_smartphone;"contactless"->R.drawable.icon_contactless;"ifd"->R.drawable.icon_ifd;"wifi"->R.drawable.icon_wifi;"stop"->R.drawable.icon_square;"copy"->R.drawable.icon_copy
         else->R.drawable.icon_settings
@@ -92,15 +120,9 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
                 drawContext.canvas.nativeCanvas.drawText("REISEPASS",95f,115f,paint)
                 drawLine(gold.copy(alpha=.6f),Offset(82f,125f),Offset(108f,125f),.7f)
             }
-            "eid" -> rotate(-7f,Offset(100f,83f)) {
-                drawRoundRect(color.copy(alpha=.16f),Offset(33f,43f),Size(126f,84f),CornerRadius(8f))
-                drawRoundRect(Color(0xffe8edff),Offset(28f,36f),Size(126f,84f),CornerRadius(8f))
-                drawRoundRect(color,Offset(28f,36f),Size(126f,84f),CornerRadius(8f),style=stroke)
-                drawLine(color,Offset(43f,49f),Offset(73f,49f),2f,StrokeCap.Round)
-                drawCircle(color.copy(alpha=.65f),10f,Offset(58f,73f))
-                drawRoundRect(color.copy(alpha=.65f),Offset(43f,86f),Size(30f,22f),CornerRadius(9f,9f))
-                for((i,width) in listOf(48f,40f,30f).withIndex())drawLine(color,Offset(88f,61f+i*14),Offset(88f+width,61f+i*14),2.5f,StrokeCap.Round)
-                drawLine(color.copy(alpha=.4f),Offset(86f,105f),Offset(136f,105f),1.2f)
+            "eid" -> rotate(-4f,Offset(100f,83f)) {
+                drawRoundRect(Navy.copy(alpha=.09f),Offset(16f,42f),Size(140f,88f),CornerRadius(5f))
+                translate(12f,37f){scale(140f/856f,88f/540f,pivot=Offset.Zero){identityDocument()}}
             }
             else -> {
                 drawCircle(Brush.radialGradient(listOf(Color(0xffe9edff),Color(0xfff3f5ff)),Offset(83f,81f),72f),72f,Offset(83f,81f))
@@ -126,8 +148,8 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
 }
 
 @Composable internal fun Action(label:String,primary:Boolean=true,modifier:Modifier=Modifier,enabled:Boolean=true,onClick:()->Unit) {
-    val icon=when {label.contains("importieren")->"import";label.contains("speichern")->"save";label.contains("kopieren")->"copy";label.contains("starten")->"play";label.contains("beenden")->"stop";label.contains("Profil")||label.contains("hinzufügen")->"add";else->null}
-    val accent=if(icon=="stop")Color(0xffdc4657)else Blue
+    val icon=when {label.contains("importieren")->"import";label.contains("exportieren")->"export";label.contains("speichern")->"save";label.contains("kopieren")->"copy";label.contains("starten")->"play";label.contains("beenden")->"stop";label.contains("Profil")||label.contains("hinzufügen")->"add";else->null}
+    val accent=if(icon=="stop"||label=="Abmelden"||label.startsWith("Wird abgemeldet"))Color(0xffdc4657)else Blue
     val content:@Composable RowScope.()->Unit={
         if(icon!=null){Glyph(icon,if(primary)Color.White else accent,Modifier.size(20.dp));Spacer(Modifier.width(9.dp))}
         Text(label.removePrefix("＋  "),fontSize=14.sp,fontWeight=FontWeight.SemiBold,letterSpacing=0.sp)

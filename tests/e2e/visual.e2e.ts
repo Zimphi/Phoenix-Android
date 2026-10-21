@@ -5,9 +5,11 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   await expect(screen.getByText('Lokale Testprofile')).toBeVisible();
   await expect(screen.getByText('eID', { exact: true })).toBeVisible();
   await expect(screen.getByText('ePassport', { exact: true })).toBeVisible();
-  await expect(screen.getByText(/Neues Profil/)).toBeVisible();
+  await expect(screen.getByText('Neues Profil', { exact: true })).not.toBeVisible();
+  await expect(screen.getByText('Profile verfügbar', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('document-types'));
   await screen.getByText('eID', { exact: true }).tap();
+  await expect(screen.getByText('Neues eID-Profil', { exact: true })).toBeVisible();
   await expect(screen.getByText('Max Mustermann', { exact: true })).toBeVisible();
   await expect(screen.getByText('eID · Testprofil', { exact: true })).toBeVisible();
   console.log(await app.screenshot('eid-profiles'));
@@ -21,7 +23,7 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   await expect(screen.getByText(/Familienname: MUSTERMANN/)).toBeVisible();
   await expect(screen.getByText('Simulation starten', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('editor'));
-  await screen.swipe({direction:'down'});
+  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('DG2', { exact: true }));
   await expect(screen.getByText('DG2', { exact: true })).toBeVisible();
   await screen.getByTestId('nav-Simulation').getByText('Simulation', { exact: true }).tap();
   await expect(screen.getByText('Lokal auf diesem Smartphone', { exact: true })).not.toBeVisible();
@@ -31,7 +33,7 @@ test('capture the agreed profile and about layouts on the phone', async ({ app, 
   await expect(screen.getByText('Bereit zum Starten', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('simulation'));
   await screen.getByText('Über', { exact: true }).tap();
-  await expect(screen.getByText('Versionsinfos kopieren', { exact: true })).toBeVisible();
+  await expect(screen.getByText('Versionsinfos kopieren', { exact: true })).not.toBeVisible();
   console.log(await app.screenshot('about'));
   await screen.getByRole('button', { name: 'Einstellungen' }).tap();
   await expect(screen.getByText('Cloud-Anbindung', { exact: true })).toBeVisible();

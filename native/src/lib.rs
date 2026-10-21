@@ -11,6 +11,11 @@ mod activation;
 mod remote;
 mod remote_identity;
 static READER: Mutex<Option<remote::Reader>> = Mutex::new(None);
+// Compile the unchanged, pinned LDS parser used by the desktop terminal.
+extern crate cav4_local_prototype as phoenix_pqc;
+#[path = "../../.private/terminal/src/lds.rs"]
+#[allow(dead_code)]
+mod passport_lds;
 mod provision;
 static ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
 static RUNTIME: OnceLock<Mutex<(Native,Option<phoenix_eid_core::application::Application>)>> = OnceLock::new();

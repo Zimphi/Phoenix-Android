@@ -28,3 +28,5 @@ QR scanning uses zxing-android-embedded 4.3.0 and ZXing core under Apache-2.0:
 https://github.com/journeyapps/zxing-android-embedded
 https://github.com/zxing/zxing
 Camera frames are decoded locally.
+
+Offline country catalogue: Zimphi/CountryCode-ISO-3166-1-alpha-3-, revision 3c037c9c2b67d0119d5b3a5c54294ac2a7e0dd52. Data and German names: Debian iso-codes / pycountry, LGPL-2.1-or-later. Source and hash: countries.lock.json. Licence: LGPL-2.1.txt.

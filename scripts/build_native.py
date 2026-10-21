@@ -32,7 +32,7 @@ def verify_dependencies(source, dependencies):
 def build(ndk,check):
     from prepare_test_fixture import verify
     verify()
-    locations={'host':'simulator','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
+    locations={'host':'simulator','terminal':'terminal','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
     lock=json.loads((ROOT/'components.lock.json').read_text())
     for name,entry in lock.items():
         source=ROOT/'.private'/locations[name]
@@ -48,7 +48,8 @@ def build(ndk,check):
                 'dependencies/eid-reference': 'eid-reference'},
         'epassport': {'dependencies/Phoenix-PQC-Rust': 'pqc',
                       'dependencies/Phoenix-License-Client': 'license'},
-        'host': {'components/eid': 'eid', 'components/passport': 'epassport'},
+        'terminal': {'dependencies/epassport':'epassport','dependencies/Phoenix-License-Client':'license','dependencies/Phoenix-PQC-Rust':'pqc'},
+        'host': {'components/eid': 'eid', 'components/passport': 'epassport', 'components/terminal':'terminal'},
     }.items():
         verify_dependencies(ROOT/'.private'/locations[name],
                             {path: lock[key]['commit'] for path, key in dependencies.items()})

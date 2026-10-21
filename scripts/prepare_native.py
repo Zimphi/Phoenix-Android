@@ -30,14 +30,17 @@ def link(parent,relative,destination):
     if not path.exists(): path.symlink_to(destination,target_is_directory=True)
 def prepare(workspace):
     lock=json.loads((ROOT/'components.lock.json').read_text()); private=ROOT/'.private';private.mkdir(exist_ok=True)
-    sources={'host':workspace/'Phoenix-Simulator-Rust','eid':workspace/'Phoenix-eID-Core-Rust','epassport':workspace/'Phoenix-ePassport-Core-Rust','pqc':workspace/'Phoenix-PQC-Rust','license':workspace/'Phoenix-License-Client','eid-reference':workspace/'Phoenix-eID-Core-Rust/dependencies/eid-reference'}
-    locations={'host':'simulator','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
+    sources={'terminal':workspace/'Phoenix-IS-Terminal-Rust','host':workspace/'Phoenix-Simulator-Rust','eid':workspace/'Phoenix-eID-Core-Rust','epassport':workspace/'Phoenix-ePassport-Core-Rust','pqc':workspace/'Phoenix-PQC-Rust','license':workspace/'Phoenix-License-Client','eid-reference':workspace/'Phoenix-eID-Core-Rust/dependencies/eid-reference'}
+    locations={'host':'simulator','terminal':'terminal','eid':'eid','epassport':'epassport','pqc':'pqc','license':'license','eid-reference':'eid-reference'}
     for name,source in sources.items(): clone(source,private/locations[name],lock[name]['commit'])
     link(private,'Phoenix-PQC-Rust',private/'pqc')
     for parent in [private/'eid',private/'epassport']:
         link(parent,'dependencies/Phoenix-License-Client',private/'license')
         link(parent,'dependencies/Phoenix-PQC-Rust',private/'pqc')
     link(private/'eid','dependencies/eid-reference',private/'eid-reference')
+    link(private/'terminal','dependencies/epassport',private/'epassport')
+    link(private/'terminal','dependencies/Phoenix-License-Client',private/'license')
+    link(private/'terminal','dependencies/Phoenix-PQC-Rust',private/'pqc')
     link(private/'eid','dependencies/epassport',private/'epassport')
     link(private/'simulator','components/eid',private/'eid')
     from prepare_test_fixture import prepare as prepare_fixture

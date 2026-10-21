@@ -95,6 +95,22 @@ internal class PkiDevice(private val context:Context) {
             .remove("pending_code").remove("pending_alias").commit()){"Gerätezuordnung konnte nicht gespeichert werden"}
         return "Gerät registriert. Zentralen PKI-Status prüfen."
     }
+    @Synchronized fun identity():JSONObject=runCatching{JSONObject(preferences.getString("account","{}")?:"{}")}.getOrDefault(JSONObject()).put("user_id",userId()?:"")
+    companion object {
+        internal fun identityFromStatus(result:JSONObject):JSONObject {
+            check(result.getBoolean("authenticated")){"Geräteanmeldung fehlgeschlagen"}
+            val owner=result.getString("user_id")
+            require(UUID.fromString(owner).toString()==owner){"Benutzerkennung fehlt"}
+            val account=result.optJSONObject("account")
+            require(account==null||account.getString("user_id")==owner){"Falsche Benutzerzuordnung"}
+            val identity=JSONObject().put("user_id",owner)
+            for(key in listOf("username","display_name","email")) {
+                val value=account?.opt(key)
+                if(value is String&&value.length<=254&&!value.any{it.isISOControl()}&&value.isNotBlank())identity.put(key,value)
+            }
+            return identity
+        }
+    }
     @Synchronized fun userId()=preferences.getString("user_id",null)
     @Synchronized fun environment()=preferences.getString("environment",null)
     @Synchronized fun connected()=preferences.contains("id")
@@ -118,11 +134,9 @@ internal class PkiDevice(private val context:Context) {
     }
     @Synchronized fun status():String {
         val result=authenticated("status")
-        check(result.getBoolean("authenticated")){"Geräteanmeldung fehlgeschlagen"}
-        val owner=result.getString("user_id")
-        require(UUID.fromString(owner).toString()==owner){"Benutzerkennung fehlt"}
-        check(preferences.edit().putString("user_id",owner).commit()){"Benutzerkennung konnte nicht gespeichert werden"}
-        return if(result.optBoolean("pki_ready"))"Gerät und zentrale PKI bereit" else "Gerät authentifiziert · zentrale PKI noch nicht eingerichtet"
+        val identity=identityFromStatus(result)
+        check(preferences.edit().putString("user_id",identity.getString("user_id")).putString("account",identity.toString()).commit()){"Benutzerkennung konnte nicht gespeichert werden"}
+        return if(result.optBoolean("pki_ready"))"Angemeldet · Zentrale PKI verfügbar" else "Angemeldet · Zentrale PKI noch nicht verfügbar"
     }
     @Synchronized fun disconnect():String {
         check(authenticated("disconnect").getBoolean("disconnected")){"Sperrung nicht bestätigt"}

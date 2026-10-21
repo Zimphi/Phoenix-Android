@@ -26,3 +26,13 @@ PersoSim Profile01–11 and ProfileUB01–05: synthetic test data from
 https://github.com/PersoSim/de.persosim.simulator at
 2b04578928ae5a1b40189dabe87c4939cb69bdf1, GPL-3.0.
 See licenses/GPL-3.0.txt. GlobalTester is excluded.
+
+## Offline country catalogue
+
+`icao_countries_DE.json` is copied unchanged from
+https://github.com/Zimphi/CountryCode-ISO-3166-1-alpha-3- at the revision in
+`countries.lock.json`, by the repository owner's explicit request. Its source
+data and German translations come from Debian iso-codes via pycountry
+(LGPL-2.1-or-later; see `licenses/LGPL-2.1.txt`). The original JSON, source
+repository and integrity hash are retained. Utopia is a separate synthetic UI
+option and is not presented as an ISO country.

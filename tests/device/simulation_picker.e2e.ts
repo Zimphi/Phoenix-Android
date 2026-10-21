@@ -7,14 +7,15 @@ test('simulation selects document type then profile without opening the editor',
  await screen.getByTestId('nav-Simulation').getByText('Simulation',{exact:true}).tap();
  await screen.getByText('Profil auswählen',{exact:true}).tap();
  await expect(screen.getByText('Dokumenttyp auswählen',{exact:true})).toBeVisible();
- await screen.getByRole('checkbox').nth(0).tap();
+ await app.screenshot('simulation-document-types');
+ await screen.getByText('ePassport',{exact:true}).tap();
  await screen.getByText('Erika Mustermann',{exact:true}).tap();
  await expect(screen.getByText('ePassport · Testprofil',{exact:true})).toBeVisible();
  await expect(screen.getByText('Profil geladen',{exact:true})).toBeVisible();
  await expect(screen.getByRole('group').filter({hasText:'IFD-Schnittstelle',has:screen.getByRole('radio')}).last()).toBeDisabled();
  await expect(screen.getByText('Datengruppen',{exact:true})).not.toBeVisible();
  await screen.getByText('Erika Mustermann',{exact:true}).tap();
- await screen.getByRole('checkbox').nth(1).tap();
+ await screen.getByText('eID',{exact:true}).tap();
  await screen.getByText('Max Mustermann',{exact:true}).tap();
  await expect(screen.getByText('eID · Testprofil',{exact:true})).toBeVisible();
  await expect(screen.getByText('Profil geladen',{exact:true})).toBeVisible();
@@ -41,7 +42,7 @@ test('editor play keeps an invalid draft in the editor',async({app,screen,device
  await screen.getByText('eID',{exact:true}).tap();
  await screen.getByText('Max Mustermann',{exact:true}).tap();
  await screen.getByText('Einstellungen',{exact:true}).tap();
- await screen.getByRole('textbox').nth(0).fill('');
+ await screen.getByRole('textbox').nth(0).fill('12');
  await app.back();
  await expect(screen.getByRole('button',{name:'Profil in Simulation übernehmen',exact:true})).toBeDisabled();
  await expect(screen.getByText('Änderungen speichern',{exact:true})).not.toBeVisible();

@@ -4,7 +4,6 @@ import android.content.*
 import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,6 +12,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.platform.testTag
@@ -38,7 +38,8 @@ class MainActivity:ComponentActivity() {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val account=remember{PkiDevice(context.applicationContext)}
-    var userId by remember{mutableStateOf(account.userId())}
+    var identity by remember{mutableStateOf(account.identity())}
+    val userId=identity.optString("user_id").takeIf{it.isNotBlank()}
     var accountBusy by remember{mutableStateOf(false)}
     val storeResult=remember{runCatching{ProfileStore(context)}}
     val store=storeResult.getOrNull()
@@ -48,7 +49,6 @@ class MainActivity:ComponentActivity() {
     var revision by remember{mutableIntStateOf(0)}
     var message by remember{mutableStateOf<String?>(null)}
     var legal by remember{mutableStateOf<String?>(null)}
-    var creating by remember{mutableStateOf(false)}
     var editing by remember{mutableStateOf<String?>(null)}
     var editingValue by remember{mutableStateOf("")}
     var status by remember{mutableStateOf("Simulation nicht aktiv")}
@@ -57,9 +57,11 @@ class MainActivity:ComponentActivity() {
     var pairBusy by remember{mutableStateOf(false)}
     var forgetPairing by remember{mutableStateOf(false)}
     var simulationPicker by remember{mutableStateOf(false)}
+    var startup by remember{mutableStateOf(true)}
     val coreReady=remember{CompletableDeferred<Unit>()}
     LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(page!="IFD-Schnittstelle")withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"))}};remoteState=JSONObject();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
     LaunchedEffect(Unit) {
+        val began=android.os.SystemClock.uptimeMillis()
         val initialization=withContext(Dispatchers.IO){
             runCatching {
                 check(NativeCore.available){"Native Core-Bibliothek fehlt"}
@@ -68,6 +70,8 @@ class MainActivity:ComponentActivity() {
             }
         }
         initialization.fold({coreReady.complete(Unit)},{coreReady.completeExceptionally(it)})
+        delay((1000L-(android.os.SystemClock.uptimeMillis()-began)).coerceAtLeast(0L))
+        startup=false
         if(initialization.isSuccess)withContext(Dispatchers.IO){runCatching{TrialActivation.activate()}.onFailure{android.util.Log.w("Phoenix","Hintergrundinitialisierung noch nicht verfügbar")}}
     }
     LaunchedEffect(page,wlan,status) {
@@ -77,12 +81,24 @@ class MainActivity:ComponentActivity() {
             delay(1000)
         }
     }
-    val clipboard=LocalClipboardManager.current
     val components=remember{JSONObject(context.assets.open("components.lock.json").use{ProfileStore.read(it)})}
     val importer=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri->
         if(uri!=null&&store!=null)scope.launch{
             val result=withContext(Dispatchers.IO){runCatching{context.contentResolver.openInputStream(uri).use{ProfileStore.read(it)}}}
             result.onSuccess{raw->runCatching{store.importDraft(raw)}.onSuccess{selected=it;selectedKind=it.kind;revision++;page="Editor"}.onFailure{message=it.message}}.onFailure{message="Import fehlgeschlagen: ${it.message}"}
+        }
+    }
+    var exportId by rememberSaveable{mutableStateOf<String?>(null)}
+    val exporter=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+        val id=exportId;exportId=null
+        if(uri!=null&&id!=null&&store!=null)scope.launch {
+            val result=runCatching{ProfileStore.exportDraft(store.profiles.single{it.id==id})}
+            result.onSuccess{bytes->
+                withContext(Dispatchers.IO){runCatching{
+                    val stream=context.contentResolver.openOutputStream(uri,"wt")?:error("Datei nicht beschreibbar")
+                    stream.use{it.write(bytes)}
+                }}.onSuccess{message="Profil exportiert"}.onFailure{message="Export fehlgeschlagen: ${it.message}"}
+            }.onFailure{message="Export fehlgeschlagen: ${it.message}"}
         }
     }
     if(store==null){Box(Modifier.fillMaxSize().background(Page).padding(24.dp)){Text("Profilspeicher nicht lesbar. Vorhandene Daten bleiben erhalten.",color=Navy)};return}
@@ -93,7 +109,6 @@ class MainActivity:ComponentActivity() {
         val profile=Profile.parse(draft)
         store.profiles.add(profile)
         runCatching{store.save()}.onSuccess{selected=profile;selectedKind=kind;revision++;page="Editor"}.onFailure{store.profiles.remove(profile);message=it.message}
-        creating=false
     }
     fun startSimulation() {
         page="Simulation"
@@ -161,36 +176,39 @@ class MainActivity:ComponentActivity() {
         val old=profile.name;val previous=profile.settings;profile.name=value;profile.settings=settings
         return runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++}.onFailure{profile.name=old;profile.settings=previous;message=it.message}.isSuccess
     }
-    LaunchedEffect(page){userId=account.userId();if(account.connected())withContext(Dispatchers.IO){runCatching{account.status()}}.onSuccess{userId=account.userId()}}
+    LaunchedEffect(page){identity=account.identity();if(account.connected())withContext(Dispatchers.IO){runCatching{account.status()}}.onSuccess{identity=account.identity()}}
     val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
+    if(startup){Startup();return}
     Column(Modifier.fillMaxSize().background(Page).statusBarsPadding().semantics{testTagsAsResourceId=true}) {
         Row(Modifier.fillMaxWidth().height(if(page=="Profile")96.dp else 56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
             if(page=="Profile"||page=="Simulation") {
                 Brand(Modifier.size(if(page=="Profile")72.dp else 34.dp,if(page=="Profile")86.dp else 42.dp));Spacer(Modifier.width(12.dp));Text("Phoenix",fontSize=if(page=="Profile")30.sp else 20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
             }else{
-                if(page in listOf("Editor","Einstellungen","Profilliste","IFD-Schnittstelle","Zentrale PKI","Benutzer"))IconButton({page=when(page){"Editor"->"Profilliste";"Profilliste"->"Profile";"IFD-Schnittstelle","Zentrale PKI","Benutzer"->"Einstellungen";else->"Über"}},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
+                if(page in listOf("Editor","Einstellungen","Profilliste","IFD-Schnittstelle","Cloud-Anbindung","Benutzer"))IconButton({page=when(page){"Editor"->"Profilliste";"Profilliste"->"Profile";"IFD-Schnittstelle","Cloud-Anbindung","Benutzer"->"Einstellungen";else->"Über"}},Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
                 if(page=="Editor"||page=="Profilliste") {Spacer(Modifier.weight(1f));Brand(Modifier.size(30.dp,38.dp))}
                 else Text(page,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.6).sp,color=Navy,modifier=Modifier.weight(1f))
             }
-            if(userId!=null&&page!="Benutzer")TextButton({page="Benutzer"},Modifier.semantics{contentDescription="Benutzerkonto öffnen"}){Text(userId!!.take(8),fontSize=11.sp,maxLines=1)}
-            if(page !in listOf("Einstellungen","Editor","Profilliste","IFD-Schnittstelle","Zentrale PKI","Benutzer"))IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
+            if(userId!=null&&page!="Benutzer")IconButton({page="Benutzer"},Modifier.semantics{contentDescription="Benutzerkonto öffnen"}.testTag("open-account")){AccountAvatar(Modifier.size(30.dp))}
+            if(page !in listOf("Einstellungen","Editor","Profilliste","IFD-Schnittstelle","Cloud-Anbindung","Benutzer"))IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
         }
         Box(Modifier.weight(1f).padding(horizontal=Inset).padding(top=8.dp,bottom=16.dp)) {
             val visibleProfiles=remember(revision){store.profiles.toList()}
             key(Unit) {
                 when(page) {
-                    "Profile"->ProfileList(visibleProfiles,{selectedKind=it;selected=null;page="Profilliste"},{creating=true})
+                    "Profile"->ProfileList(visibleProfiles,{selectedKind=it;selected=null;page="Profilliste"})
                     "Profilliste"->ProfileSelection(visibleProfiles,selectedKind,{selected=it;page="Editor"},{createProfile(selectedKind)})
-                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{name,settings->saveProfile(profile,name,settings)},{
-                        runCatching{val draft=profile.json().put("id","eid-copy-"+java.util.UUID.randomUUID().toString()).put("name",profile.name+" · Kopie");store.importDraft(draft.toString())}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
+                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{
+                        runCatching{ProfileStore.exportDraft(profile)}.onSuccess{exportId=profile.id;exporter.launch(profile.id+".json")}.onFailure{message=it.message}
+                    },{name,settings->saveProfile(profile,name,settings)},{
+                        runCatching{store.importDraft(profile.editableCopy().toString())}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
                     },{group,value->if(profile.signedFixture||profile.passportCatalog)message="Originales signiertes Testprofil: Datengruppen bleiben unverändert. Eigene Daten bitte in einem separaten Profil bearbeiten." else {editingValue=value;editing=group}},{selectSimulation(profile)})}
-                    "Benutzer"->UserAccount(userId,account.environment(),accountBusy){
+                    "Benutzer"->UserAccount(identity,account.environment(),accountBusy){
                         accountBusy=true
-                        scope.launch{withContext(Dispatchers.IO){runCatching{account.disconnect()}}.onSuccess{userId=null;page="Einstellungen"}.onFailure{message=it.message};accountBusy=false}
+                        scope.launch{withContext(Dispatchers.IO){runCatching{account.disconnect()}}.onSuccess{identity=JSONObject();page="Einstellungen"}.onFailure{message=it.message};accountBusy=false}
                     }
-                    "Über"->About(components){clipboard.setText(androidx.compose.ui.text.AnnotatedString("Phoenix Android ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n$components"));Toast.makeText(context,"Versionsinfos kopiert",Toast.LENGTH_SHORT).show()}
-                    "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"},{page="Zentrale PKI"})
-                    "Zentrale PKI"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())){PkiDeviceSettings()}
+                    "Über"->About(components)
+                    "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"},{page="Cloud-Anbindung"})
+                    "Cloud-Anbindung"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())){PkiDeviceSettings(identity){identity=account.identity()}}
                     "IFD-Schnittstelle"->ReaderSettings(remoteState,pairBusy,::pairReader,{
                         scope.launch{withContext(Dispatchers.IO){NativeCore.call(JSONObject().put("op","ifd_stop"))};remoteState=JSONObject()}
                     },{forgetPairing=true})
@@ -213,22 +231,24 @@ class MainActivity:ComponentActivity() {
         forgetPairing=false;scope.launch{withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_forget"))}.onFailure{message=it.message}};remoteState=JSONObject()}
     }){Text("Entfernen")}},dismissButton={TextButton({forgetPairing=false}){Text("Abbrechen")}})
     if(message!=null)AlertDialog(onDismissRequest={message=null},title={Text("Phoenix")},text={Text(message!!)},confirmButton={TextButton({message=null}){Text("OK")}})
-    if(creating)AlertDialog(onDismissRequest={creating=false},title={Text("Neues Testprofil")},text={Column{
-        listOf("epassport" to "ePassport","eid" to "eID").forEach{(kind,label)->Action(label,false){createProfile(kind)}}
-    }},confirmButton={},dismissButton={TextButton({creating=false}){Text("Abbrechen")}})
     editing?.let{group->
-        var value by remember(group){mutableStateOf(editingValue)}
-        AlertDialog(onDismissRequest={editing=null},title={Text("$group bearbeiten")},text={OutlinedTextField(value,{value=it.take(65536)},modifier=Modifier.fillMaxWidth().heightIn(min=120.dp,max=260.dp),label={Text("$group Inhalt")})},confirmButton={TextButton({
-            val profile=selected!!;val old=profile.groups
+        val profile=selected!!
+        fun saveGroup(value:String) {
+            val old=profile.groups
             profile.groups=JSONObject(old.toString()).put(group,value)
-            runCatching{store.save()}.onSuccess{revision++;editing=null}.onFailure{profile.groups=old;message=it.message}
-        }){Text("Speichern")}},dismissButton={TextButton({editing=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("cancel-group")){Text("Abbrechen")}})
+            runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;editing=null}.onFailure{profile.groups=old;message=it.message}
+        }
+        if(profile.kind=="epassport"&&group=="DG1")PassportDataEditor(editingValue,{editing=null},::saveGroup)
+        else {
+            var value by remember(group){mutableStateOf(editingValue)}
+            AlertDialog(onDismissRequest={editing=null},title={Text("$group bearbeiten")},text={OutlinedTextField(value,{value=it.take(65536)},modifier=Modifier.fillMaxWidth().heightIn(min=120.dp,max=260.dp),label={Text("$group Inhalt")})},confirmButton={TextButton({saveGroup(value)}){Text("Speichern")}},dismissButton={TextButton({editing=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("cancel-group")){Text("Abbrechen")}})
+        }
     }
     legal?.let{title->
         val text=remember(title){when(title){
             "Impressum"->"Phoenix Android\nhttps://github.com/Zimphi/Phoenix-Android\n\nVerantwortlichen- und Kontaktangaben sind vor Veröffentlichung einer App-Distribution zu ergänzen."
             "Datenschutz"->"Diese Entwicklungsversion speichert synthetische Profilentwürfe lokal auf dem Gerät. Keine Analyse- oder Werbedienste.\n\nDie Hintergrundaktivierung verwendet den Phoenix Lizenz-Testrelay über HTTPS. Übermittelt werden pseudonyme Geräte- und Anfragehashes sowie die ausgewählten Core-Produkte. Der private Geräteschlüssel bleibt im Android Keystore. Die native Lizenzprüfung benötigt zusätzlich authentifizierte Zeit von Netnod bzw. Cloudflare. Profile und NFC-APDUs werden dafür nicht übertragen. Bei ausdrücklich gestarteter WLAN-Simulation wird das ausgewählte synthetische eID-Profil über eine verschlüsselte Remote-IFD-Verbindung an eine gekoppelte AusweisApp im lokalen Netzwerk übermittelt. Die Kopplung verwendet einen zeitlich begrenzten Code; anschließend werden die Kommunikationszertifikate geprüft. Beim Verlassen der Simulation oder beim Wechsel in den Hintergrund endet der WLAN-Kartenleser. Die optionale PKI-Geräteanmeldung sendet nach dem Scannen eines QR-Codes die Einmalberechtigung, den öffentlichen Geräteschlüssel, den Gerätenamen und signierte Anfragen an den im QR-Code festgelegten Phoenix-Server. Kennung und Schlüsselzuordnung bleiben lokal gespeichert; der private PKI-Geräteschlüssel bleibt im Android Keystore. Status und Abmeldung verwenden signierte HTTPS-Anfragen. Die Cloud-Simulation ist nicht umgesetzt."
-            else->context.assets.open("THIRD_PARTY_NOTICES.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LICENSE.txt").use{ProfileStore.read(it)}
+            else->context.assets.open("THIRD_PARTY_NOTICES.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LICENSE.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LGPL-2.1.txt").use{ProfileStore.read(it)}
         }}
         AlertDialog(onDismissRequest={legal=null},title={Text(title)},text={Text(text,Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()))},confirmButton={TextButton({legal=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("close-legal")){Text("Schließen")}})
     }

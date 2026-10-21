@@ -19,7 +19,25 @@ final class ProfileStore {
         if(list.length()>200)throw new IOException("Zu viele gespeicherte Profile");
         for(int i=0;i<list.length();i++) profiles.add(Profile.parse(list.getJSONObject(i)));
         boolean changed=false;
-        JSONArray passports=NativeCore.call(new JSONObject().put("op","passport_catalog")).getJSONArray("profiles");
+        JSONObject supplied=NativeCore.call(new JSONObject().put("op","passport_catalog"));
+        Set<String> retired=new HashSet<>();
+        JSONArray retiredIds=supplied.getJSONArray("retired_ids");
+        for(int i=0;i<retiredIds.length();i++)retired.add(retiredIds.getString(i));
+        JSONArray removed=new JSONArray();
+        for(Profile profile:profiles)if(profile.kind.equals("epassport")&&retired.contains(profile.id))removed.put(profile.json());
+        if(removed.length()>0) {
+            AtomicFile archive=new AtomicFile(new File(context.getFilesDir(),"retired-passport-drafts.json"));
+            JSONArray previous;
+            if(archive.getBaseFile().exists())try(InputStream input=archive.openRead()){previous=new JSONArray(read(input,16*1024*1024));}
+            else previous=new JSONArray();
+            Set<String> recorded=new HashSet<>();
+            for(int i=0;i<previous.length();i++)recorded.add(previous.getJSONObject(i).toString());
+            for(int i=0;i<removed.length();i++)if(recorded.add(removed.getJSONObject(i).toString()))previous.put(removed.getJSONObject(i));
+            write(archive,previous);
+            profiles.removeIf(profile->profile.kind.equals("epassport")&&retired.contains(profile.id));
+            changed=true;
+        }
+        JSONArray passports=supplied.getJSONArray("profiles");
         for(int i=0;i<passports.length();i++) {
             JSONObject draft=passports.getJSONObject(i);
             Profile found=null;
@@ -63,11 +81,21 @@ final class ProfileStore {
     }
     void save() throws Exception {
         JSONArray list=new JSONArray(); for(Profile profile:profiles) list.put(profile.json());
+        write(file,list);
+    }
+    private static void write(AtomicFile file,JSONArray list) throws Exception {
         byte[] bytes=list.toString(2).getBytes(StandardCharsets.UTF_8);
         if(bytes.length>16*1024*1024) throw new IOException("Profilspeicher überschreitet 16 MiB");
         FileOutputStream stream=file.startWrite();
         try { stream.write(bytes); file.finishWrite(stream); }
         catch(Exception error) { file.failWrite(stream); throw error; }
+    }
+    static byte[] exportDraft(Profile profile) throws Exception {
+        JSONObject draft=profile.json();
+        Profile.parse(draft);
+        byte[] bytes=draft.toString(2).getBytes(StandardCharsets.UTF_8);
+        if(bytes.length>1024*1024)throw new IOException("Profil überschreitet 1 MiB");
+        return bytes;
     }
     Profile importDraft(String source) throws Exception {
         Profile imported=Profile.parse(new JSONObject(source));

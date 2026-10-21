@@ -15,6 +15,24 @@ class RepositoryContract(unittest.TestCase):
             self.assertIn(path, (ROOT/'.gitignore').read_text())
         self.assertFalse((ROOT/'cores').exists())
 
+    def test_country_data_is_original_and_icao_exceptions_are_preserved(self):
+        import hashlib
+        lock=json.loads((ROOT/'countries.lock.json').read_text())
+        raw=(ROOT/'app/src/main/assets/icao_countries_DE.json').read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),lock['sha256'])
+        rows=json.loads(raw)
+        self.assertEqual(len(rows),250)
+        self.assertEqual(len({row['mrz_value'] for row in rows}),250)
+        self.assertEqual(next(row for row in rows if row['iso_alpha3']=='DEU')['mrz_value'],'D<<')
+        self.assertEqual(next(row for row in rows if row['icao_9303_code']=='RKS')['mrz_value'],'RKS')
+
+    def test_qr_scanner_keeps_portrait_and_is_not_exported(self):
+        root=ET.parse(ROOT/'app/src/main/AndroidManifest.xml').getroot()
+        namespace='{http://schemas.android.com/apk/res/android}'
+        capture=next(a for a in root.iter('activity') if a.attrib[namespace+'name']=='.QrCaptureActivity')
+        self.assertEqual(capture.attrib[namespace+'screenOrientation'],'portrait')
+        self.assertEqual(capture.attrib[namespace+'exported'],'false')
+
     def test_core_build_identity_is_exact_and_packaged(self):
         raw=(ROOT/'components.lock.json').read_bytes()
         self.assertEqual(raw,(ROOT/'app/src/main/assets/components.lock.json').read_bytes())
@@ -31,11 +49,11 @@ class RepositoryContract(unittest.TestCase):
         cloud = json.loads((workspace / 'Phoenix-Vercel/components.lock.json').read_text())
         local = json.loads((workspace / 'Phoenix-Simulator-Rust/components.lock.json').read_text())
         names = {'eid': 'Phoenix-eID-Core-Rust', 'epassport': 'Phoenix-ePassport-Core-Rust',
-                 'pqc': 'Phoenix-PQC-Rust', 'license': 'Phoenix-License-Client'}
+                 'pqc': 'Phoenix-PQC-Rust', 'license': 'Phoenix-License-Client', 'terminal': 'Phoenix-IS-Terminal-Rust'}
         local_components = {entry['name']: entry for entry in local['components']}
         for name, repository in names.items():
             expected = android[name]['commit']
-            self.assertEqual(cloud[name]['commit'], expected, name)
+            self.assertEqual(cloud['terminal-rust' if name=='terminal' else name]['commit'], expected, name)
             entry = local_components[repository]
             self.assertEqual(entry['revision'], expected, name)
             for build in entry.get('builds', []):
@@ -58,7 +76,7 @@ class RepositoryContract(unittest.TestCase):
         if private.exists():
             self.assertEqual(hashlib.sha256(private.read_bytes()).hexdigest(),lock['sha256'])
             catalog=json.loads(private.read_bytes())
-            self.assertEqual(len(catalog['profiles']),33)
+            self.assertEqual(len(catalog['profiles']),8)
             self.assertEqual(sum(p['simulatable'] for p in catalog['profiles']),8)
 
     def test_shared_registry_dependencies_use_identical_locked_versions(self):

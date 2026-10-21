@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/Zimphi/CountryCode-ISO-3166-1-alpha-3-",
+  "commit": "3c037c9c2b67d0119d5b3a5c54294ac2a7e0dd52",
+  "path": "output/icao_countries_DE.json",
+  "sha256": "a1396702785b5764d7a8c5dfd982fa1e05b388388c23f3d8b325284c0139ddd1",
+  "count": 250,
+  "upstream": "Debian iso-codes / pycountry",
+  "data_license": "LGPL-2.1-or-later"
+}

@@ -2,20 +2,20 @@
   "host": {
     "repository": "git@github.com:Zimphi/Phoenix-Simulator-Rust.git",
     "path": ".",
-    "commit": "8d3153a3fc85317a9aadd9eb0ba66dd9656fd1c7",
+    "commit": "993c69854a2af14316f12958634fe63e9555d827",
     "version": "0.13.5-rc.2"
   },
   "eid": {
     "repository": "git@github.com:Zimphi/Phoenix-eID-Core-Rust.git",
     "path": "components/eid",
-    "commit": "4406e71ab8da8e60c495639b81f693f003ea8573",
+    "commit": "6c8e01ea236119ad9b51baea42b1dc35b539bc9a",
     "version": "0.1.7",
     "branch": "codex/common-platform-cores"
   },
   "epassport": {
     "repository": "git@github.com:Zimphi/Phoenix-ePassport-Core-Rust.git",
     "path": "components/eid/dependencies/epassport",
-    "commit": "5d4bcf14901eb8b1676dc9351acca5e0e887d939",
+    "commit": "e2083deab6af56668e81e0ec5e8c80b1c913b71a",
     "version": "0.4.8",
     "branch": "codex/common-platform-cores"
   },
@@ -36,5 +36,12 @@
     "commit": "cbabab9c66350b8113058a9cc1d85777367106ef",
     "path": "components/eid/dependencies/eid-reference",
     "purpose": "Unmodified community mapping data required by the eID core"
+  },
+  "terminal": {
+    "repository": "git@github.com:Zimphi/Phoenix-IS-Terminal-Rust.git",
+    "path": "components/terminal",
+    "commit": "81704833cd64182dc54b55a699f83956c537ee08",
+    "version": "0.1.8",
+    "branch": "codex/common-platform-cores"
   }
 }
