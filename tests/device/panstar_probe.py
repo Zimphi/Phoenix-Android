@@ -17,6 +17,8 @@ try:
 finally: channel.close()
 """
 command=[sys.executable,'-c',workflow,request['reader'],request.get('rights','identity')]
+if binary:=os.environ.get('PHOENIX_EID_CLIENT_BINARY'):
+ command=[binary,'panstar','--yes','--no-browser','--reader',request['reader'],'--rights-profile',request.get('rights','identity')]
 environment=dict(os.environ,PYTHONPATH=str(client)+os.pathsep+str(client/'crypto_service'))
 process=subprocess.Popen(command,stdin=slave,stdout=slave,stderr=slave,env=environment,start_new_session=True,preexec_fn=lambda:fcntl.ioctl(0,termios.TIOCSCTTY,0))
 os.close(slave)
@@ -31,7 +33,7 @@ try:
   if not part:break
   output+=part
   if len(output)>1024*1024:failure='Client output limit';break
-  prompts=len(re.findall(rb'(?m)^eID-PIN \(6 Ziffern\): ',output))
+  prompts=len(re.findall(rb'(?m)^(?:eID-PIN \(6 Ziffern\)|Pin): ',output))
   if prompts>1:failure='Credential retry requested; stopped before another PIN attempt';break
   if prompts==1 and not sent:os.write(master,(request['pin']+'\n').encode());sent=True
  if process.poll() is None and (failure or time.monotonic()>=deadline):
@@ -53,7 +55,7 @@ finally:
   except ProcessLookupError: pass
  os.close(master)
 text=output.decode(errors='replace')
-match=re.search(r'Authentisierung erfolgreich abgeschlossen\.\s+Übertragene Kartenkommandos: (\d+)',text)
+match=re.search(r'Authentisierung erfolgreich abgeschlossen\.\s+Übertragene Kartenkommandos: (\d+)',text) or re.search(r'Authentisierung abgeschlossen\. Kartenkommandos: (\d+)',text)
 result={'authenticated':process.returncode==0 and match is not None,'returncode':process.returncode,'commands':int(match[1]) if match else None}
 if result['authenticated']:
  refresh=re.search(r'Rücksprungadresse: (https://\S+)',text)
