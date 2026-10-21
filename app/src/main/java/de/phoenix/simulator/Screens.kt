@@ -197,7 +197,9 @@ import org.json.JSONObject
             Text(profile.name,fontSize=16.sp,fontWeight=FontWeight.ExtraBold,color=Navy,maxLines=1,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,modifier=Modifier.weight(1f))
             IconButton({if(profile.passportCatalog||save())onSimulate()},enabled=valid,modifier=Modifier.semantics{contentDescription="Profil in Simulation übernehmen"}){Box(Modifier.size(28.dp).background(Color(0xffe7eef6),androidx.compose.foundation.shape.CircleShape),contentAlignment=Alignment.Center){Glyph("play",Navy,Modifier.size(15.dp))}}
         }
-        DocumentPreview(profile,displayedGroups,if(profile.kind=="epassport")Modifier.fillMaxWidth().aspectRatio(720f/550f)else Modifier.fillMaxWidth().aspectRatio(856f/540f).clickable(role=Role.Button,onClickLabel=if(back)"Vorderseite anzeigen" else "Rückseite anzeigen"){back=!back},mrz=displayedMrz,portraitOverride=portrait,back=back)
+        Box(Modifier.fillMaxWidth().testTag("document-preview-frame").aspectRatio(if(profile.kind=="epassport")720f/550f else 856f/540f)) {
+            DocumentPreview(profile,displayedGroups,Modifier.fillMaxSize().clickable(role=Role.Button,onClickLabel=if(back)"Vorderseite anzeigen" else if(profile.kind=="epassport")"Zweite Passseite anzeigen" else "Rückseite anzeigen"){back=!back},mrz=displayedMrz,portraitOverride=portrait,back=back)
+        }
         if(profile.kind=="eid") {
             val warnings=buildList {
                 if(!eidActive)add("eID deaktiviert")

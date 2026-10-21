@@ -97,6 +97,17 @@ fn community_check(profile:&EidProfile)->Value {
         Err(error)=>json!({"status":"unresolved","message":error.to_string(),"postal":postal,"city":place.city}),
     }
 }
+fn passport_supplementary(groups:&BTreeMap<String,String>)->Value {
+    // Display only standardized DG11 text; missing national-only fields stay empty.
+    let fields=groups.get("DG11").and_then(|raw|phoenix_eid_core::transport::unhex(raw).ok())
+        .and_then(|raw|phoenix_eid_core::ber::one(&raw,0x6b).ok().map(Vec::from))
+        .and_then(|raw|phoenix_eid_core::ber::parse(&raw).ok().map(|fields|fields.into_iter()
+            .filter(|field|matches!(field.0,0x5f42|0x5f14))
+            .filter_map(|field|std::str::from_utf8(field.1).ok().map(|text|(field.0,text.replace('<'," ").trim().to_owned())))
+            .collect::<Vec<_>>())).unwrap_or_default();
+    let text=|tag|fields.iter().find(|field|field.0==tag).map(|field|field.1.clone()).unwrap_or_default();
+    json!({"residence":text(0x5f42),"title":text(0x5f14)})
+}
 pub fn describe(value:Value)->Result<Value>{
     ensure!(serde_json::to_vec(&value)?.len()<=1024*1024,"Draft limit");
     let draft:Draft=serde_json::from_value(value)?;
@@ -128,7 +139,8 @@ pub fn describe(value:Value)->Result<Value>{
             Some(raw)=>if let Some(image)=portrait_source(raw){Some(image.to_vec())}else{crate::passport_lds::parse_dg2(&phoenix_eid_core::transport::unhex(raw)?)?.into_iter().next().map(|face|face.image)},
             None=>None,
         };
-        Ok(json!({"groups":groups,"mrz":mrz,"portrait":portrait.map(|bytes|openssl::base64::encode_block(&bytes))}))
+        let supplementary=passport_supplementary(&groups);
+        Ok(json!({"groups":groups,"mrz":mrz,"supplementary":supplementary,"portrait":portrait.map(|bytes|openssl::base64::encode_block(&bytes))}))
     }
 }
 fn portrait_source(value:&str)->Option<&'static [u8]> {
@@ -354,6 +366,16 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn supplementary_page_uses_dg11_without_inventing_values() {
+        let mut groups=BTreeMap::new();
+        assert_eq!(passport_supplementary(&groups),json!({"residence":"","title":""}));
+        let mut values=phoenix_eid_core::ber::encode(0x5f42,b"KOELN").unwrap();
+        values.extend(phoenix_eid_core::ber::encode(0x5f14,b"DR.").unwrap());
+        groups.insert("DG11".into(),phoenix_simulator::runtime::hex(&phoenix_eid_core::ber::encode(0x6b,&values).unwrap()));
+        assert_eq!(passport_supplementary(&groups),json!({"residence":"KOELN","title":"DR."}));
+        groups.insert("DG11".into(),"6bff".into());
+        assert_eq!(passport_supplementary(&groups),json!({"residence":"","title":""}));
+    }
     #[test] fn equivalent_dg_representations_do_not_repersonalize_a_loaded_card() {
         let before=EidProfile::default();let mut after=before.clone();
         for number in &before.active {after.values.insert(*number,phoenix_eid_core::profile::decode(*number,&before.encode(*number).unwrap()).unwrap());}

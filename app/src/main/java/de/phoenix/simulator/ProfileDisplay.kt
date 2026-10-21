@@ -111,7 +111,7 @@ internal fun td1FromTd3(td3:String,type:String):String {
 /** Schematic document view; every displayed field comes from the selected profile. */
 @Composable internal fun DocumentPreview(profile:Profile,groups:JSONObject=profile.groups,modifier:Modifier=Modifier,compact:Boolean=false,mrz:String="",portraitOverride:String=profile.portraitSex,back:Boolean=false) {
     val passport=profile.kind=="epassport"
-    if(passport){val display=passportDisplay(profile);PassportPreview(profile,display?.groups?:groups,modifier,compact,display?.mrz?:mrz,display?.image);return}
+    if(passport){val display=passportDisplay(profile);PassportPreview(profile,display?.groups?:groups,modifier,compact,display?.mrz?:mrz,display?.image,back,display?.supplementary?:JSONObject());return}
     val context=LocalContext.current
     val countries=remember{CountryCodes.load(context)}
     val sex=portraitOverride.ifEmpty{portraitSex(profile,groups)}
@@ -134,7 +134,7 @@ internal fun td1FromTd3(td3:String,type:String):String {
 
 internal fun passportDate(raw:String)=if(raw.matches(Regex("[0-9]{6}")))"${raw.substring(4,6)}.${raw.substring(2,4)}.${raw.substring(0,2)}" else if(raw.matches(Regex("[0-9]{8}")))"${raw.substring(6,8)}.${raw.substring(4,6)}.${raw.substring(0,4)}" else raw
 
-@Composable private fun PassportPreview(profile:Profile,groups:JSONObject,modifier:Modifier,compact:Boolean,mrz:String,image:ImageBitmap?) {
+@Composable private fun PassportPreview(profile:Profile,groups:JSONObject,modifier:Modifier,compact:Boolean,mrz:String,image:ImageBitmap?,back:Boolean,supplementary:JSONObject) {
     val context=LocalContext.current
     val countries=remember{CountryCodes.load(context)}
     val data=runCatching{JSONObject(groups.optString("DG1"))}.getOrDefault(JSONObject())
@@ -143,7 +143,11 @@ internal fun passportDate(raw:String)=if(raw.matches(Regex("[0-9]{6}")))"${raw.s
     val paper=remember{BitmapFactory.decodeResource(context.resources,R.drawable.document_paper).asImageBitmap()}
     val code=data.optString("issuing_state")
     val country=if(code in listOf("D","D<<","DEU"))"BUNDESREPUBLIK DEUTSCHLAND" else countries.firstOrNull{it.hasCode(code)}?.name?:code
-    BoxWithConstraints(modifier.semantics{contentDescription="Reisepass Innenseite"}) {
+    if(back) {
+        Box(modifier,contentAlignment=Alignment.Center) {PassportDetails(profile,supplementary,Modifier.fillMaxHeight().aspectRatio(1051f/1496f))}
+        return
+    }
+    BoxWithConstraints(modifier.testTag("passport-page-front").semantics{contentDescription="Reisepass Innenseite"}) {
         Canvas(Modifier.fillMaxSize()) {
             val factor=minOf(size.width/720f,size.height/550f)
             translate((size.width-720f*factor)/2,(size.height-550f*factor)/2){scale(factor,factor,pivot=Offset.Zero) {
@@ -156,7 +160,7 @@ internal fun passportDate(raw:String)=if(raw.matches(Regex("[0-9]{6}")))"${raw.s
     }
 }
 
-private data class PassportDisplay(val groups:JSONObject,val mrz:String,val image:ImageBitmap?)
+private data class PassportDisplay(val groups:JSONObject,val mrz:String,val image:ImageBitmap?,val supplementary:JSONObject)
 @Composable private fun passportDisplay(profile:Profile):PassportDisplay? {
     val draft=profile.coreDraft()
     var result by remember(profile.id,profile.groups.toString()){mutableStateOf<PassportDisplay?>(null)}
@@ -165,8 +169,8 @@ private data class PassportDisplay(val groups:JSONObject,val mrz:String,val imag
             val description=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))
             val encoded=description.optString("portrait")
             val image=if(encoded.isEmpty()||encoded=="null")null else decodePortrait(encoded)
-            PassportDisplay(description.getJSONObject("groups"),description.optString("mrz"),image)
-        }.getOrDefault(PassportDisplay(profile.groups,"",null))}
+            PassportDisplay(description.getJSONObject("groups"),description.optString("mrz"),image,description.optJSONObject("supplementary")?:JSONObject())
+        }.getOrDefault(PassportDisplay(profile.groups,"",null,JSONObject()))}
     }
     return result
 }
