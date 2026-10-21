@@ -62,26 +62,41 @@ internal fun DrawScope.passportDocument(country:String,code:String,surname:Strin
 }
 
 internal fun DrawScope.identityDocument(surname:String="MUSTERMANN",given:String="ERIKA",birth:String="12.08.83",nationality:String="D",expiry:String="01.08.31",place:String="BERLIN",can:String="123456",country:String="BUNDESREPUBLIK DEUTSCHLAND") {
-    drawRoundRect(Brush.linearGradient(listOf(Color(0xffe7eadb),Color(0xfff0e5dc),Color(0xffdfe8df))),size=Size(856f,540f),cornerRadius=CornerRadius(20f))
-    securityLines(856f,540f)
-    drawRoundRect(Color(0xffb5c1b4),Offset(1f,1f),Size(854f,538f),CornerRadius(20f),style=Stroke(1.4f))
-    drawRect(Color(0xff344b92),Offset(28f,21f),Size(86f,59f))
+    val outline=Path().apply{addRoundRect(RoundRect(0f,0f,856f,540f,CornerRadius(20f)))}
+    clipPath(outline) {
+        drawRect(Brush.linearGradient(listOf(Color(0xffeee9d9),Color(0xfff5f1e7),Color(0xffe0e8d9))),size=Size(856f,540f))
+        drawOval(Brush.radialGradient(listOf(Color(0xffdab7b5).copy(alpha=.32f),Color.Transparent),Offset(554f,270f),410f),Offset(244f,-100f),Size(620f,690f))
+        securityLines(856f,540f)
+        for(index in 0..37) {
+            val ribbon=Path().apply {
+                moveTo(302f+index*4f,-20f)
+                cubicTo(715f+index*3f,125f,217f+index*7f,332f,900f,470f+index*2.8f)
+            }
+            drawPath(ribbon,Color(0xffad878c).copy(alpha=.17f),style=Stroke(.65f))
+        }
+        for(index in 0..18)drawOval(Color(0xff89a28a).copy(alpha=.18f),Offset(693f-index*6f,166f-index*8f),Size(108f+index*12f,233f+index*16f),style=Stroke(.7f))
+        drawRect(Color(0xfff7f5ec).copy(alpha=.25f),Offset(348f,101f),Size(483f,386f))
+    }
+    drawRoundRect(Color(0xffaab7a8),Offset(1f,1f),Size(854f,538f),CornerRadius(20f),style=Stroke(1.3f))
+    drawRect(Color(0xff334b89),Offset(28f,21f),Size(86f,59f))
     for(i in 0..11) {
         val angle=i*Math.PI/6
         drawCircle(Color(0xffebd674),2f,Offset(71f+25f*kotlin.math.sin(angle).toFloat(),50f+20f*kotlin.math.cos(angle).toFloat()))
     }
     documentText("DE",56f,59f,17f,true,width=50f,color=Color.White)
-    documentText(country.uppercase(),144f,40f,18f,true,width=550f,color=Color(0xff34546a))
-    documentText("PERSONALAUSWEIS",144f,64f,20f,true,width=470f,color=Color(0xff34546a))
-    documentText("IDENTITY CARD / CARTE D’IDENTITÉ",144f,81f,8f,width=410f,color=Color(0xff34546a))
-    documentText("TESTDOKUMENT",682f,70f,13f,true,width=145f,color=Muted)
+    documentText(country.uppercase(),138f,37f,17f,true,width=505f,color=Color(0xff34546a))
+    documentText("TESTPROFIL / SYNTHETIC IDENTITY DOCUMENT",138f,49f,6.5f,width=505f,color=Color(0xff34546a))
+    documentText("PERSONALAUSWEIS",138f,70f,20f,true,width=470f,color=Color(0xff34546a))
+    documentText("IDENTITY CARD / CARTE D’IDENTITÉ",138f,84f,8f,width=410f,color=Color(0xff34546a))
+    documentText("M U S T E R",678f,51f,18f,mono=true,width=153f,color=Color(0xff46615e))
     translate(29f,111f){identityPortrait(305f,403f)}
-    documentField("Name / Surname",surname,361f,128f,464f,26f)
-    documentField("Vornamen / Given names",given,361f,204f,464f,25f)
-    documentField("Geburtstag / Date of birth",birth,361f,281f,225f,24f)
-    documentField("Staatsangehörigkeit / Nationality",nationality,602f,281f,224f,24f)
-    documentField("Geburtsort / Place of birth",place,361f,355f,466f,25f)
-    documentField("Gültig bis / Date of expiry",expiry,361f,432f,260f,24f)
-    documentText(can,654f,458f,33f,mono=true,width=170f)
-    documentText("SYNTHETISCHES TESTDOKUMENT",360f,512f,10f,width=460f,color=Muted)
+    drawRect(Color(0xffa4b2aa).copy(alpha=.65f),Offset(29f,111f),Size(305f,403f),style=Stroke(.8f))
+    documentField("Name / Surname / Nom",surname,361f,129f,456f,27f)
+    documentField("Vornamen / Given names / Prénoms",given,361f,199f,456f,26f)
+    documentField("Geburtstag / Date of birth",birth,361f,271f,224f,24f)
+    documentField("Staatsangehörigkeit / Nationality",nationality,602f,271f,218f,24f)
+    documentField("Geburtsort / Place of birth / Lieu de naissance",place,361f,337f,456f,25f)
+    documentField("Gültig bis / Date of expiry",expiry,361f,407f,260f,24f)
+    documentText(can,649f,462f,34f,mono=true,width=173f)
+    documentText("SYNTHETISCHES TESTDOKUMENT",361f,510f,9f,width=456f,color=Color(0xff657b70))
 }

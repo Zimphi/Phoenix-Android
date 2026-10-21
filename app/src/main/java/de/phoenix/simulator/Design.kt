@@ -68,15 +68,30 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
 
 internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size.height) {
     scale(width/100f,height/128f,pivot=Offset.Zero) {
-        drawRoundRect(Brush.verticalGradient(listOf(Color(0xffdce6e5),Color(0xffb8cbca))),size=Size(100f,128f),cornerRadius=CornerRadius(7f))
-        val silhouette=Color(0xff6f8080)
-        drawOval(silhouette,Offset(31f,20f),Size(38f,49f))
-        val shoulders=Path().apply {
-            moveTo(7f,128f);lineTo(11f,105f);cubicTo(14f,88f,34f,87f,39f,78f)
-            lineTo(39f,64f);lineTo(61f,64f);lineTo(61f,78f)
-            cubicTo(66f,87f,86f,88f,89f,105f);lineTo(93f,128f);close()
+        drawRect(Brush.verticalGradient(listOf(Color(0xffe7e8e2),Color(0xffc8d3d1))),size=Size(100f,128f))
+        val head=Path().apply {
+            moveTo(50f,16f)
+            cubicTo(36f,16f,29f,26f,30f,43f)
+            cubicTo(25f,40f,26f,55f,32f,57f)
+            cubicTo(34f,69f,42f,76f,50f,77f)
+            cubicTo(58f,76f,66f,69f,68f,57f)
+            cubicTo(74f,55f,75f,40f,70f,43f)
+            cubicTo(71f,26f,64f,16f,50f,16f);close()
         }
-        drawPath(shoulders,silhouette)
+        val bust=Path().apply {
+            moveTo(40f,71f);lineTo(40f,82f)
+            cubicTo(36f,87f,23f,89f,14f,94f)
+            cubicTo(5f,99f,3f,112f,2f,128f)
+            lineTo(98f,128f)
+            cubicTo(97f,112f,95f,99f,86f,94f)
+            cubicTo(77f,89f,64f,87f,60f,82f)
+            lineTo(60f,71f);close()
+        }
+        val silhouette=Brush.linearGradient(listOf(Color(0xff687c83),Color(0xff3b515f)),Offset(20f,22f),Offset(78f,128f))
+        drawPath(bust,silhouette)
+        drawPath(head,silhouette)
+        val collar=Path().apply {moveTo(38f,84f);lineTo(50f,96f);lineTo(62f,84f)}
+        drawPath(collar,Color(0xffa4b3b4).copy(alpha=.6f),style=Stroke(.65f,cap=StrokeCap.Round,join=StrokeJoin.Round))
     }
 }
 
