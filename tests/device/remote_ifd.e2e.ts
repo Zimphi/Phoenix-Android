@@ -15,19 +15,19 @@ test('IFD pairing belongs to settings and simulation has two interface icons',as
  }
  await screen.getByTestId('nav-Profile').getByText('Profile',{exact:true}).tap();
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('PersoSim 03 Testausweis',{exact:true}).tap();
+ await screen.getByTestId('profile-eid-persosim03').tap();
  await screen.getByTestId('nav-Simulation').getByText('Simulation',{exact:true}).tap();
- const profileBounds=await screen.getByText('PersoSim 03 Testausweis',{exact:true}).boundingBox();
+ const profileBounds=await screen.getByText('MUSTERMANN',{exact:true}).first().boundingBox();
  const startBounds=await screen.getByText('Simulation starten',{exact:true}).boundingBox();
  for(let pass=0;pass<3;pass++){
  await screen.getByRole('radio').nth(1).tap();
  await expect(screen.getByText('Smartphone als Kartenleser',{exact:true})).toBeVisible();
- expect(await screen.getByText('PersoSim 03 Testausweis',{exact:true}).boundingBox()).toEqual(profileBounds);
+ expect(await screen.getByText('MUSTERMANN',{exact:true}).first().boundingBox()).toEqual(profileBounds);
  expect(await screen.getByText('Simulation starten',{exact:true}).boundingBox()).toEqual(startBounds);
  await expect(screen.getByText('Kopplung starten',{exact:true})).not.toBeVisible();
  await screen.getByRole('radio').nth(0).tap();
  await expect(screen.getByText('Smartphone an das Lesegerät halten',{exact:true})).toBeVisible();
- expect(await screen.getByText('PersoSim 03 Testausweis',{exact:true}).boundingBox()).toEqual(profileBounds);
+ expect(await screen.getByText('MUSTERMANN',{exact:true}).first().boundingBox()).toEqual(profileBounds);
  expect(await screen.getByText('Simulation starten',{exact:true}).boundingBox()).toEqual(startBounds);
  }
  await app.screenshot('stable-interface-layout');
@@ -38,7 +38,7 @@ if(process.env.PHOENIX_IFD_PAIRED_TEST==='1') {
   await device.openApp('de.phoenix.simulator',{relaunch:true});
   try {
    await screen.getByText('eID',{exact:true}).tap();
-   await screen.getByText('PersoSim 03 Testausweis',{exact:true}).tap();
+   await screen.getByTestId('profile-eid-persosim03').tap();
    await screen.getByTestId('nav-Simulation').getByText('Simulation',{exact:true}).tap();
    await screen.getByRole('radio').nth(1).tap();
    await screen.getByText('Simulation starten',{exact:true}).tap();

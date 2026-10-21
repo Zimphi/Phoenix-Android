@@ -23,7 +23,7 @@ if(process.env.PHOENIX_CLIENT_GUI_DIR) {
    }
    await screen.getByTestId('nav-Profile').getByText('Profile',{exact:true}).tap();
    await screen.getByText('eID',{exact:true}).tap();
-   await screen.getByText('Max Mustermann',{exact:true}).tap();
+   await screen.getByTestId('profile-eid-max').tap();
    await screen.getByTestId('nav-Simulation').getByText('Simulation',{exact:true}).tap();
    await screen.getByRole('radio').nth(mode==='ifd'?1:0).tap();
    await screen.getByText('Simulation starten',{exact:true}).tap();

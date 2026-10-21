@@ -4,7 +4,7 @@ import {expect} from 'e2e';
 test('profile settings export through Android document storage',async({app,screen,device})=>{
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('Max Mustermann',{exact:true}).tap();
+ await screen.getByTestId('profile-eid-max').tap();
  await expect(screen.getByText('Profil exportieren',{exact:true})).not.toBeVisible();
  await screen.getByText('Einstellungen',{exact:true}).tap();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Profil exportieren',{exact:true}));

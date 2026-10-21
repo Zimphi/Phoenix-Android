@@ -121,7 +121,7 @@ internal fun td1FromTd3(td3:String,type:String):String {
     val identityMrz=identityMrz(profile,groups,countries)
     val issuer=profileField(profile,groups,"issuing_state")
     val country=if(issuer in listOf("D","D<<","DEU"))"BUNDESREPUBLIK DEUTSCHLAND" else countries.firstOrNull{it.hasCode(issuer)}?.name?:issuer
-    Canvas(modifier.testTag("identity-portrait-${sex.ifEmpty{"auto"}}").semantics{contentDescription=(when{profile.documentType()=="UB"->"eID-Karte";residenceDocument(profile.documentType())->"Aufenthaltstitel";else->"Personalausweis"})+if(back)" Rückseite" else " Vorderseite"}) {
+    Canvas(modifier.testTag("identity-portrait-${sex.ifEmpty{"auto"}}").semantics{contentDescription=(when{profile.documentType()=="UB"->"eID-Karte";residenceDocument(profile.documentType())->"Aufenthaltstitel";else->"Personalausweis"})+(if(back)" Rückseite" else " Vorderseite")+" · Seriennummer ${profile.documentNumber}"}) {
         val factor=minOf(size.width/856f,size.height/540f)
         translate((size.width-856f*factor)/2,(size.height-540f*factor)/2){scale(factor,factor,pivot=Offset.Zero) {
             if(profile.documentType()=="UB")unionDocument(profile,groups,paper,watermark,back)

@@ -2,15 +2,15 @@ import {test} from '@e2e-dev/mobile';
 import {expect} from 'e2e';
 
 test('a signed eID opens an editable copy and saves a DG immediately',{timeout:180_000},async({app,screen,device})=>{
- const original='PersoSim 03 Testausweis',copy=original+' · Kopie';
+ const original=screen.getByTestId('profile-eid-persosim03'),copy=screen.getByTestId('profile-source-eid-persosim03').first();
  const button=(label:string)=>screen.getByRole('group').filter({hasText:label,has:screen.getByRole('button')}).last().getByRole('button');
  async function list(){await device.openApp('de.phoenix.simulator',{relaunch:true});await screen.getByText('eID',{exact:true}).tap();}
  await list();
- const existing=await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByText(copy,{exact:true}).first(),{timeout:20000}).then(()=>true,()=>false);
+ const existing=await screen.getByTestId('profile-list').scrollUntilVisible(copy,{timeout:20000}).then(()=>true,()=>false);
  if(existing){
-  await screen.getByText(copy,{exact:true}).first().tap();await screen.getByText('Familienname',{exact:true}).tap();
+  await copy.tap();await screen.getByText('Familienname',{exact:true}).tap();
  }else{
-  await list();await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByText(original,{exact:true}));await screen.getByText(original,{exact:true}).tap();
+  await list();await screen.getByTestId('profile-list').scrollUntilVisible(original);await original.tap();
   await screen.getByText('Familienname',{exact:true}).tap();
   await expect(screen.getByText('Originalprofil bearbeiten',{exact:true})).toBeVisible();
   await button('Kopie bearbeiten').tap();
@@ -23,12 +23,12 @@ test('a signed eID opens an editable copy and saves a DG immediately',{timeout:1
  try {
   await expect(screen.getByText('LINDEN',{exact:true})).toBeVisible();
   await app.screenshot('persosim-copy-dg5-saved');
-  await list();await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByText(copy,{exact:true}).first());await screen.getByText(copy,{exact:true}).first().tap();
+  await list();await screen.getByTestId('profile-list').scrollUntilVisible(copy);await copy.tap();
   await expect(screen.getByText('LINDEN',{exact:true})).toBeVisible();
  } finally {
-  await list();await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByText(copy,{exact:true}).first());await screen.getByText(copy,{exact:true}).first().tap();
+  await list();await screen.getByTestId('profile-list').scrollUntilVisible(copy);await copy.tap();
   await screen.getByText('Familienname',{exact:true}).tap();
   await screen.getByRole('textbox').fill('MUSTERMANN');await app.back();await button('Übernehmen').tap();
  }
- await expect(screen.getByText('MUSTERMANN',{exact:true})).toBeVisible();
+ await expect(screen.getByText('MUSTERMANN',{exact:true}).first()).toBeVisible();
 });

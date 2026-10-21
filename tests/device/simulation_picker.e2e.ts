@@ -16,7 +16,7 @@ test('simulation selects document type then profile without opening the editor',
  await expect(screen.getByText('Datengruppen',{exact:true})).not.toBeVisible();
  await screen.getByText('Erika Mustermann',{exact:true}).tap();
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('Max Mustermann',{exact:true}).tap();
+ await screen.getByTestId('profile-eid-max').tap();
  await expect(screen.getByText('eID · Testprofil',{exact:true})).toBeVisible();
  await expect(screen.getByText('Profil geladen',{exact:true})).toBeVisible();
  await expect(screen.getByRole('group').filter({hasText:'IFD-Schnittstelle',has:screen.getByRole('radio')}).last()).toBeEnabled();
@@ -28,9 +28,9 @@ test('simulation selects document type then profile without opening the editor',
 test('editor play transfers the saved profile to simulation without starting it',async({app,screen,device})=>{
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('Max Mustermann',{exact:true}).tap();
+ await screen.getByTestId('profile-eid-max').tap();
  await screen.getByRole('button',{name:'Profil in Simulation übernehmen',exact:true}).tap();
- await expect(screen.getByText('Max Mustermann',{exact:true})).toBeVisible();
+ await expect(screen.getByText('MUSTERMANN',{exact:true}).first()).toBeVisible();
  await expect(screen.getByText('Simulation starten',{exact:true})).toBeVisible();
  await expect(screen.getByText('Simulation beenden',{exact:true})).not.toBeVisible();
  await app.screenshot('editor-profile-in-simulation');
@@ -40,9 +40,9 @@ test('editor play transfers the saved profile to simulation without starting it'
 test('editor play keeps an invalid draft in the editor',async({app,screen,device})=>{
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('Max Mustermann',{exact:true}).tap();
+ await screen.getByTestId('profile-eid-max').tap();
  await screen.getByText('Einstellungen',{exact:true}).tap();
- await screen.getByRole('textbox').nth(0).fill('12');
+ await screen.getByRole('textbox').filter({has:screen.getByText('CAN',{exact:true})}).fill('12');
  await app.back();
  await expect(screen.getByRole('button',{name:'Profil in Simulation übernehmen',exact:true})).toBeDisabled();
  await expect(screen.getByText('Änderungen speichern',{exact:true})).not.toBeVisible();

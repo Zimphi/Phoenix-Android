@@ -76,18 +76,40 @@ fn eid_profile(groups:&BTreeMap<String,String>)->Result<EidProfile>{
     }
     profile.validate()?;Ok(profile)
 }
+fn profile_changed(before:&EidProfile,after:&EidProfile)->Result<bool> {
+    if before.active!=after.active{return Ok(true);}
+    for number in &after.active {if before.encode(*number)?!=after.encode(*number)?{return Ok(true);}}
+    Ok(false)
+}
+fn community_check(profile:&EidProfile)->Value {
+    use phoenix_eid_core::profile::GeneralPlace;
+    let place=match profile.values.get(&17) {
+        Some(Group::Place(place))|Some(Group::GeneralPlace(GeneralPlace::Structured(place)))=>Some(place),
+        Some(Group::Places(places)) if places.len()==1=>match &places[0]{GeneralPlace::Structured(place)=>Some(place),_=>None},
+        _=>None,
+    };
+    let Some(place)=place else{return json!({"status":"unstructured"});};
+    if !["D","DEU"].contains(&place.country.as_str()){return json!({"status":"foreign"});}
+    let postal=place.zipcode.as_deref().unwrap_or("");
+    let current=match profile.values.get(&18){Some(Group::Text(text))=>text.clone(),Some(Group::Bytes(bytes))=>phoenix_simulator::runtime::hex(bytes),_=>String::new()};
+    match phoenix_eid_core::community_id::lookup_community_id(postal,&place.city) {
+        Ok(found)=>json!({"status":if current==found.encoded_community_id{"matching"}else{"mismatch"},"current":current,"expected":found.encoded_community_id,"ags":found.community_id,"postal":postal,"city":place.city}),
+        Err(error)=>json!({"status":"unresolved","message":error.to_string(),"postal":postal,"city":place.city}),
+    }
+}
 pub fn describe(value:Value)->Result<Value>{
     ensure!(serde_json::to_vec(&value)?.len()<=1024*1024,"Draft limit");
     let draft:Draft=serde_json::from_value(value)?;
     ensure!(draft.format=="phoenix-android-draft-v1","Unsupported draft");
     if draft.kind=="eid" {
         let profile=eid_profile(&draft.groups)?;
+        let community=community_check(&profile);
         let mut groups=BTreeMap::new();
         for (number,value) in profile.values {
             if number==16 {continue;}
             groups.insert(format!("DG{number}"),match value {Group::Text(text)=>text,other=>serde_json::to_string(&other)?});
         }
-        Ok(json!({"groups":groups,"active":profile.active}))
+        Ok(json!({"groups":groups,"active":profile.active,"community":community}))
     }else{
         ensure!(draft.kind=="epassport","Unsupported draft");
         let mut groups=draft.groups;
@@ -208,14 +230,17 @@ pub fn ri_update(root:&Path,id:&str,frozen:bool,regenerate:bool,keys:Option<Valu
 pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<phoenix_eid_core::application::Application>)->Result<Value>{
     let bytes=serde_json::to_vec(&value)?;ensure!(bytes.len()<=1024*1024,"Draft limit");
     let mut legacy=value.clone();
-    if let Some(fields)=legacy.as_object_mut(){fields.remove("baseline_groups");fields.remove("ri");}
+    if let Some(fields)=legacy.as_object_mut(){fields.remove("baseline_groups");fields.remove("ri");if fields.get("pki_infrastructure").is_some_and(|v|v=="profile"){fields.remove("pki_infrastructure");}}
     let legacy_bytes=serde_json::to_vec(&legacy)?;
+    if let Some(fields)=legacy.as_object_mut(){fields.remove("pki_infrastructure");}
+    let legacy_unselected=serde_json::to_vec(&legacy)?;
     let draft:Draft=serde_json::from_value(value)?;
     ensure!(draft.format=="phoenix-android-draft-v1"&&["eid","epassport"].contains(&draft.kind.as_str()),"Unsupported draft");
     pki_admin::identifier(&draft.id)?;
     if let Some(generation)=&draft.personalization_generation {ensure!(generation.len()==36&&generation.bytes().all(|b|b.is_ascii_hexdigit()||b==b'-'),"Invalid personalization generation");}
     match draft.pki_infrastructure.as_deref() {
         None=>{},
+        Some("profile")=>{},
         Some("bsi")=>ensure!(draft.kind=="eid","BSI-Testinfrastruktur ist nur für eID verfügbar"),
         Some("phoenix")=>anyhow::bail!("Zentrale Phoenix-PKI-Personalisierung ist noch nicht an den Android-Adapter angebunden"),
         _=>anyhow::bail!("Unsupported PKI infrastructure"),
@@ -251,7 +276,12 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
     let previous=if draft.kind=="eid"{binding(root,&draft.id)?}else{None};
     let tag=if signed.is_some(){"persosim"}else{&draft.kind};
     let legacy_id=profile_id(tag,&legacy_bytes);
-    let id=previous.as_ref().map(|b|b.native_id.clone()).unwrap_or_else(||if draft.kind=="eid"&&root.join("profiles/eid").join(&legacy_id).is_dir(){legacy_id}else{profile_id(tag,&bytes)});pki_admin::identifier(&id)?;
+    let original_id=profile_id(tag,&legacy_unselected);
+    let id=previous.as_ref().map(|b|b.native_id.clone()).unwrap_or_else(||{
+        if draft.kind=="eid"&&root.join("profiles/eid").join(&legacy_id).is_dir(){legacy_id}
+        else if fixture(&draft.id).is_some()&&root.join("profiles/eid").join(&original_id).is_dir(){original_id}
+        else{profile_id(tag,&bytes)}
+    });pki_admin::identifier(&id)?;
     *application=None;native.close();
     // Validate and encode before generating any local PKI or writing a profile.
     let eid=if draft.kind=="eid"{Some(eid_profile(&draft.groups)?)}else{None};
@@ -273,7 +303,7 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
         }
         if signed.is_none() {
                 let (old,_,_,_,_)=PersonalizedProfile::disclosure_source(&config(root)?.profiles.join(&id),&config(root)?.passphrase,chrono::Utc::now().timestamp()).context("Read existing eID personalization")?;
-                if serde_json::to_value(&old)?!=serde_json::to_value(&profile)? {
+                if profile_changed(&old,&profile)? {
                     let config=config(root)?;
                     let Authority::Document(document)=pki_admin::load(&config.data,"android-document",&config.passphrase)? else{anyhow::bail!("Document authority required")};
                     phoenix_eid_core::profile_editor::ProfileEditor{profile}.save_existing(&config.profiles.join(&id),&config.passphrase,document.certificate(),document.document_signers().first().context("Signer required")?,chrono::Utc::now().timestamp())?;
@@ -324,6 +354,27 @@ pub fn mount(native:&mut Native,root:&Path,value:Value,application:&mut Option<p
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn equivalent_dg_representations_do_not_repersonalize_a_loaded_card() {
+        let before=EidProfile::default();let mut after=before.clone();
+        for number in &before.active {after.values.insert(*number,phoenix_eid_core::profile::decode(*number,&before.encode(*number).unwrap()).unwrap());}
+        assert!(!profile_changed(&before,&after).unwrap());
+        after.values.insert(5,Group::Text("ANDERS".into()));assert!(profile_changed(&before,&after).unwrap());
+    }
+    #[test] fn municipality_audit_checks_every_supplied_eid_without_changing_signed_data() {
+        let catalog:Vec<Draft>=serde_json::from_str(include_str!("../../app/src/main/assets/persosim-profiles.json")).unwrap();
+        assert_eq!(catalog.len(),16);
+        for draft in catalog {
+            let before=serde_json::to_value(&draft.groups).unwrap();
+            let profile=eid_profile(&draft.groups).unwrap();
+            let check=community_check(&profile);
+            println!("{} {}",draft.id,check);
+            assert_eq!(before,serde_json::to_value(&draft.groups).unwrap());
+        }
+        let mut profile=EidProfile::default();
+        let found=community_check(&profile);assert_eq!(found["expected"],"02761100000000");
+        profile.values.insert(18,Group::Text(found["expected"].as_str().unwrap().into()));
+        assert_eq!(community_check(&profile)["status"],"matching");
+    }
     #[test] fn draft_bindings_use_the_authenticated_ber_envelope() {
         let json=br#"{"native_id":"android_example","settings":{"pin":"12345"}}"#;
         let raw=phoenix_eid_core::ber::encode(0x30,&phoenix_eid_core::ber::encode(4,json).unwrap()).unwrap();

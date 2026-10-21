@@ -15,10 +15,24 @@ class SmokeInstrumentation:Instrumentation() {
     private var activation=false
     private var importDraft:String?=null
     private var pki=false
-    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";pki=arguments?.getString("pki")=="true";importDraft=arguments?.getString("importDraft");start()}
+    private var auditCommunity=false
+    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";pki=arguments?.getString("pki")=="true";auditCommunity=arguments?.getString("auditCommunity")=="true";importDraft=arguments?.getString("importDraft");start()}
     override fun onStart(){
         val result=Bundle()
         try{
+            if(auditCommunity) {
+                val store=ProfileStore(targetContext)
+                val profiles=store.profiles.filter{it.kind=="eid"}
+                check(profiles.map{it.documentNumber}.toSet().size==profiles.size)
+                val checks=org.json.JSONArray()
+                for(profile in profiles) {
+                    check(profile.name==profile.groupText("DG5").trim())
+                    check(store.bySerial(profile.documentNumber)===profile)
+                    val check=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",profile.coreDraft())).getJSONObject("community")
+                    checks.put(JSONObject().put("id",profile.id).put("serial",profile.documentNumber).put("surname",profile.name).put("community",check))
+                }
+                result.putString("stream",checks.toString(2));finish(Activity.RESULT_OK,result);return
+            }
             if(pki){result.putString("stream",verifyPkiDevice(targetContext));finish(Activity.RESULT_OK,result);return}
             importDraft?.let{path->
                 val source=File(path).canonicalFile
@@ -31,6 +45,22 @@ class SmokeInstrumentation:Instrumentation() {
             val isolated=object:ContextWrapper(targetContext){override fun getFilesDir()=directory}
             val store=ProfileStore(isolated)
             check(store.profiles.size==26)
+            val eidProfiles=store.profiles.filter{it.kind=="eid"}
+            check(eidProfiles.map{it.documentNumber}.toSet().size==eidProfiles.size)
+            for(profile in eidProfiles) {
+                check(profile.name==profile.groupText("DG5").trim())
+                check(store.bySerial(profile.documentNumber)===profile)
+                if(profile.signedFixture)check(profile.pkiInfrastructure=="bsi")
+            }
+            val serialSource=eidProfiles.first()
+            val duplicate=serialSource.editableCopy().put("document_number",serialSource.documentNumber)
+            check(runCatching{store.importDraft(duplicate.toString())}.isFailure)
+            val uniqueCopy=store.importDraft(serialSource.editableCopy().toString())
+            check(uniqueCopy.documentNumber!=serialSource.documentNumber)
+            val serial=uniqueCopy.documentNumber
+            check(store.resetPersonalization(uniqueCopy).documentNumber==serial)
+            store.profiles.removeIf{it.id==uniqueCopy.id};store.save()
+
             check(store.profiles.count{it.id=="eid-persosim03"}==1)
             check(store.profiles.count{it.signedFixture}==16)
             check(store.profiles.count{it.passportCatalog}==8)
@@ -64,7 +94,9 @@ class SmokeInstrumentation:Instrumentation() {
                 val restored=reopened.resetPersonalization(reopened.profiles.single{it.id==own.id})
                 val data=restored.json();val generation=data.getString("personalization_generation")
                 data.remove("personalization_generation")
-                check(data.toString()==original)
+                val expected=JSONObject(original)
+                if(kind=="eid")expected.put("document_number","TEST2")
+                check(data.toString()==expected.toString())
                 check(generation.isNotEmpty()&&restored.coreDraft().getString("personalization_generation")==generation)
                 check(ProfileStore(isolated).profiles.single{it.id==own.id}.personalizationGeneration==generation)
                 store.profiles.remove(own);store.save()

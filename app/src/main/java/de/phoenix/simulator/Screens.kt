@@ -53,19 +53,22 @@ import org.json.JSONObject
 
 @Composable internal fun ProfileSelection(profiles:List<Profile>,kind:String,onSelect:(Profile)->Unit,onCreate:()->Unit) {
     val label=if(kind=="eid")"eID" else "ePassport"
-    val matching=profiles.filter{it.kind==kind}
+    var search by remember(kind){mutableStateOf("")}
+    val matching=profiles.filter{it.kind==kind&&(search.isBlank()||it.name.contains(search,true)||it.documentNumber.contains(search,true))}
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(Space)) {
         Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
             Text("$label-Profile",fontSize=30.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.9).sp,color=Navy)
             Text("${matching.size} ${if(matching.size==1)"Profil" else "Profile"} · Lokal auf diesem Gerät",fontSize=13.sp,color=Muted)
         }
+        if(kind=="eid")OutlinedTextField(search,{search=it.take(120)},label={Text("Nachname oder Seriennummer")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("profile-search"),shape=RoundedCornerShape(12.dp))
         Column(Modifier.weight(1f).testTag("profile-list").verticalScroll(rememberScrollState()).padding(top=8.dp)) {
             if(matching.isEmpty())Text("Noch kein $label-Profil vorhanden.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=24.dp))
             matching.forEach { profile ->
-                Row(Modifier.fillMaxWidth().clickable{onSelect(profile)}.padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                Row(Modifier.fillMaxWidth().testTag("profile-${profile.id}").clickable{onSelect(profile)}.padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
                     if(profile.kind=="epassport")Art("epassport",Modifier.size(60.dp,66.dp)) else DocumentPreview(profile,modifier=Modifier.size(78.dp,52.dp),compact=true)
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                        Text(profile.name,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        Text(profile.name,modifier=if(profile.persosimSource.isNotEmpty())Modifier.testTag("profile-source-${profile.persosimSource}")else Modifier,fontSize=15.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        if(profile.kind=="eid")Text(listOf(profile.groupText("DG4"),"Seriennummer ${profile.documentNumber}").filter{it.isNotBlank()}.joinToString(" · "),fontSize=11.sp,color=Muted,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(if(!profile.simulatable)"$label · Nicht simulierbar" else if(profile.signedFixture)"$label · Signiert · AusweisApp-Test" else "$label · Testprofil",fontSize=12.sp,color=Muted)
                     }
                     Glyph("chevron",Muted,Modifier.size(20.dp))
@@ -250,8 +253,8 @@ import org.json.JSONObject
                 ProfileSettingsSection("Zugangsdaten","privacy","credential-settings") {
                 if(profile.kind=="eid")OutlinedTextField(documentNumber,{input->
                     documentNumber=input.uppercase(java.util.Locale.ROOT).filter{it in 'A'..'Z'||it in '0'..'9'}.take(9)
-                    if(documentNumber.isNotEmpty())onDocumentNumber(documentNumber)
-                },label={Text("Dokumentnummer")},supportingText={Text("Wird für die automatisch berechnete MRZ verwendet.")},isError=documentNumber.isEmpty(),singleLine=true,modifier=Modifier.fillMaxWidth())
+                    if(documentNumber.isNotEmpty()&&!onDocumentNumber(documentNumber))documentNumber=profile.documentNumber
+                },label={Text("Fiktive Seriennummer")},supportingText={Text("Eindeutige Zuordnung dieses Profils; wird auch in der MRZ verwendet.")},isError=documentNumber.isEmpty(),singleLine=true,modifier=Modifier.fillMaxWidth().testTag("profile-serial"))
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                     listOf(Triple("CAN",can,{v:String->can=v}),Triple(if(transport)"Transport-PIN (5 Ziffern)" else "PIN",pin,{v:String->pin=v})).forEach { (label,value,change) ->
                         OutlinedTextField(value,{change(it.filter(Char::isDigit).take(if(label.startsWith("Transport-PIN"))5 else 6))},label={Text(label)},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription=label},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))

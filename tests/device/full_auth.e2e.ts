@@ -9,7 +9,8 @@ for (const [kind, name] of [['eid', 'Max Mustermann'], ['epassport', 'Erika EAC-
     await app.open();
     await screen.getByTestId('nav-Profile').getByText('Profile', { exact: true }).tap();
     await screen.getByText(kind === 'eid' ? 'eID' : 'ePassport', { exact: true }).tap();
-    await screen.getByText(name, { exact: true }).tap();
+    if(kind==='eid')await screen.getByTestId('profile-eid-max').tap();
+    else await screen.getByText(name, { exact: true }).tap();
     await screen.getByTestId('nav-Simulation').getByText('Simulation', { exact: true }).tap();
     await screen.getByText('Simulation starten', { exact: true }).tap();
     await expect(screen.getByText('Bereit für Lesegerät', { exact: true })).toBeVisible({ timeout: 60_000 });

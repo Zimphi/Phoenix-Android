@@ -5,9 +5,9 @@ import {expect} from 'e2e';
 test('editor shows actual eID values, a document, and saves only valid settings',async({app,screen,device})=>{
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('Max Mustermann',{exact:true}).tap();
- await expect(screen.getByText('Personalausweis Vorderseite',{exact:true})).toBeVisible();
- await expect(screen.getByText('MUSTERMANN',{exact:true})).toBeVisible();
+ await screen.getByTestId('profile-eid-max').tap();
+ await expect(screen.getByText(/^Personalausweis Vorderseite · Seriennummer /)).toBeVisible();
+ await expect(screen.getByText('MUSTERMANN',{exact:true}).first()).toBeVisible();
  await expect(screen.getByText('BERLIN',{exact:true})).toBeVisible();
  await app.screenshot('compact-identity-data-page');
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('ID',{exact:true}));

@@ -5,8 +5,8 @@ const button=(screen:any,label:string)=>screen.getByRole('group').filter({hasTex
 test('eID editor exposes persisted RI pairs and expert policy',async({app,screen,device})=>{
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByText('Max Mustermann',{exact:true}));
- await screen.getByText('Max Mustermann',{exact:true}).tap();
+ await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByTestId('profile-eid-max'));
+ await screen.getByTestId('profile-eid-max').tap();
  await screen.getByText('Einstellungen',{exact:true}).tap();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('RI-Schlüssel laden',{exact:true}));
  await button(screen,'RI-Schlüssel laden').tap();
@@ -17,6 +17,7 @@ test('eID editor exposes persisted RI pairs and expert policy',async({app,screen
  const publicKey=await screen.getByRole('textbox').nth(1).inputValue();
  for(let i=0;i<4;i++)expect((await screen.getByRole('textbox').nth(i).inputValue()).length).toBeGreaterThan(20);
  await screen.getByRole('group').filter({hasText:'Abbrechen',has:screen.getByRole('button')}).last().getByRole('button').tap();
+ await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByTestId('profile-serial'),{direction:'up'});
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('RI bei Datenänderungen beibehalten',{exact:true}));
  await expect(screen.getByText('RI bei Datenänderungen beibehalten',{exact:true})).toBeVisible();
  await expect(screen.getByText(publicKey,{exact:true})).not.toBeVisible();

@@ -97,7 +97,7 @@ internal fun residenceDocument(type:String)=type in listOf("AR","AS","AF")
                     if(places.size>1)ChoiceField("Anschrift",address.toString(),places.indices.map{it.toString() to "Anschrift ${it+1}"}){address=it.toInt()}
                     if(structuredPlaces(parsed).isEmpty()&&initial.isNotBlank())Text("Bisherige Angabe: ${groupValue("eid",group,initial)}",style=MaterialTheme.typography.bodySmall)
                     listOf("street" to "Straße und Hausnummer","zipcode" to "Postleitzahl","city" to "Ort","state" to "Bundesland / Region").forEach{(key,label)->
-                        OutlinedTextField(if(place.isNull(key))"" else place.optString(key),{update(key,it.take(120))},label={Text(label)},singleLine=true,modifier=Modifier.fillMaxWidth())
+                        OutlinedTextField(if(place.isNull(key))"" else place.optString(key),{update(key,it.take(120))},label={Text(label)},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("address-$key"))
                     }
                     CountryField("Staat",place.optString("country"),countries){country=true}
                     if(!addressValid)Text("Ort und Staat sind erforderlich.",color=MaterialTheme.colorScheme.error)

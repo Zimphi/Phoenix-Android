@@ -142,7 +142,7 @@ class MainActivity:ComponentActivity() {
     fun createProfile(kind:String) {
         if(store.ownCount()>=100){message="Maximal 100 eigene Profile";return}
         val draft=Profile.defaults().getJSONObject(if(kind=="eid")1 else 0)
-            .put("id",java.util.UUID.randomUUID().toString()).put("name","Neues ${if(kind=="eid")"eID" else "ePassport"}-Profil")
+            .put("pki_infrastructure",if(kind=="eid")"bsi" else "profile").put("id",java.util.UUID.randomUUID().toString()).put("name","Neues ${if(kind=="eid")"eID" else "ePassport"}-Profil")
         val profile=Profile.parse(draft)
         store.profiles.add(profile)
         runCatching{store.save()}.onSuccess{selected=profile;selectedKind=kind;revision++;page="Editor"}.onFailure{store.profiles.remove(profile);message=it.message}
@@ -301,7 +301,19 @@ class MainActivity:ComponentActivity() {
         fun saveGroup(value:String) {
             val old=profile.groups
             profile.groups=JSONObject(old.toString()).put(group,value)
-            runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;editing=null}.onFailure{profile.groups=old;message=it.message}
+            if(profile.kind=="eid"&&group=="DG17") {
+                val draft=profile.coreDraft()
+                scope.launch {
+                    val description=withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))}}
+                    description.onSuccess{result->
+                        val community=result.optJSONObject("community")
+                        community?.optString("expected")?.takeIf{it.isNotEmpty()}?.let{profile.groups.put("DG18",JSONObject().put("Text",it).toString())}
+                        runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;editing=null
+                            if(community?.optString("status")=="unresolved")message="Anschrift gespeichert. Gemeindeschlüssel konnte nicht automatisch ermittelt werden: "+community.optString("message")
+                        }.onFailure{profile.groups=old;message=it.message}
+                    }.onFailure{profile.groups=old;message=it.message}
+                }
+            } else runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;editing=null}.onFailure{profile.groups=old;message=it.message}
         }
         if(profile.kind=="epassport"&&group=="DG1")PassportDataEditor(editingValue,{editing=null},::saveGroup)
         else if(profile.kind=="epassport"&&group=="DG2")PassportPortraitPicker(profile,{editing=null},::saveGroup)
@@ -315,7 +327,7 @@ class MainActivity:ComponentActivity() {
         val text=remember(title){when(title){
             "Impressum"->"Phoenix Android\nhttps://github.com/Zimphi/Phoenix-Android\n\nVerantwortlichen- und Kontaktangaben sind vor Veröffentlichung einer App-Distribution zu ergänzen."
             "Datenschutz"->"Diese Entwicklungsversion speichert synthetische Profilentwürfe lokal auf dem Gerät. Keine Analyse- oder Werbedienste.\n\nDie Hintergrundaktivierung verwendet den Phoenix Lizenz-Testrelay über HTTPS. Übermittelt werden pseudonyme Geräte- und Anfragehashes sowie die ausgewählten Core-Produkte. Der private Geräteschlüssel bleibt im Android Keystore. Die native Lizenzprüfung benötigt zusätzlich authentifizierte Zeit von Netnod bzw. Cloudflare. Profile und NFC-APDUs werden dafür nicht übertragen. Bei ausdrücklich gestarteter WLAN-Simulation wird das ausgewählte synthetische eID-Profil über eine verschlüsselte Remote-IFD-Verbindung an eine gekoppelte AusweisApp im lokalen Netzwerk übermittelt. Die Kopplung verwendet einen zeitlich begrenzten Code; anschließend werden die Kommunikationszertifikate geprüft. Beim Verlassen der Simulation oder beim Wechsel in den Hintergrund endet der WLAN-Kartenleser. Die optionale PKI-Geräteanmeldung sendet nach dem Scannen eines QR-Codes die Einmalberechtigung, den öffentlichen Geräteschlüssel, den Gerätenamen und signierte Anfragen an den im QR-Code festgelegten Phoenix-Server. Kennung und Schlüsselzuordnung bleiben lokal gespeichert; der private PKI-Geräteschlüssel bleibt im Android Keystore. Status und Abmeldung verwenden signierte HTTPS-Anfragen. Die Cloud-Simulation ist nicht umgesetzt."
-            else->context.assets.open("THIRD_PARTY_NOTICES.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LICENSE.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LGPL-2.1.txt").use{ProfileStore.read(it)}
+            else->context.assets.open("THIRD_PARTY_NOTICES.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LICENSE.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LGPL-2.1.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("ODbL-1.0.txt").use{ProfileStore.read(it)}
         }}
         AlertDialog(onDismissRequest={legal=null},title={Text(title)},text={Text(text,Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()))},confirmButton={TextButton({legal=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("close-legal")){Text("Schließen")}})
     }

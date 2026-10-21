@@ -60,14 +60,32 @@ final class ProfileStore {
         for(int i=0;i<catalog.length();i++) {
             JSONObject draft=catalog.getJSONObject(i);
             boolean present=false;
-            for(Profile profile:profiles) if(profile.id.equals(draft.getString("id"))) { profile.signedFixture=true; present=true; }
-            if(!present && profiles.size()<200) {Profile profile=Profile.parse(draft);profile.signedFixture=true;profiles.add(profile);}
+            for(Profile profile:profiles) if(profile.id.equals(draft.getString("id"))) { profile.signedFixture=true; if(profile.pkiInfrastructure.isEmpty()||profile.pkiInfrastructure.equals("profile"))profile.pkiInfrastructure="bsi"; present=true; }
+            if(!present && profiles.size()<200) {Profile profile=Profile.parse(draft);profile.signedFixture=true;profile.pkiInfrastructure="bsi";profiles.add(profile);}
+        }
+        // Earlier own drafts omitted DG18 and inherited an unrelated core default.
+        for(Profile profile:profiles)if(profile.kind.equals("eid")&&!profile.signedFixture&&!profile.groups.has("DG18")) {
+            try {
+                JSONObject check=NativeCore.call(new JSONObject().put("op","describe_draft").put("draft",profile.coreDraft())).optJSONObject("community");
+                String expected=check==null?"":check.optString("expected","");
+                if(!expected.isEmpty())profile.groups.put("DG18",new JSONObject().put("Text",expected).toString());
+            } catch(Exception unavailable) { /* Keep editable drafts even when their address cannot be resolved. */ }
         }
         for(JSONArray source:new JSONArray[]{Profile.defaults(),passports,catalog})for(int i=0;i<source.length();i++){
             Profile original=Profile.parse(source.getJSONObject(i));
+            if(source==catalog)original.pkiInfrastructure="bsi";
             originals.put(original.id,original.json().toString());
         }
+        Set<String> serials=new HashSet<>();
+        for(Profile profile:profiles)if(profile.kind.equals("eid")) {
+            while(!serials.add(profile.documentNumber))profile.documentNumber=Profile.newSerial();
+        }
         save();
+    }
+    Profile bySerial(String serial) {
+        String normalized=serial.trim().toUpperCase(Locale.ROOT);
+        for(Profile profile:profiles)if(profile.kind.equals("eid")&&profile.documentNumber.equals(normalized))return profile;
+        return null;
     }
     private static boolean original(Profile profile,JSONObject draft) throws JSONException {
         JSONObject groups=draft.getJSONObject("groups"),settings=draft.getJSONObject("settings");
@@ -90,7 +108,12 @@ final class ProfileStore {
         return output.toString(StandardCharsets.UTF_8.name());
     }
     void save() throws Exception {
-        JSONArray list=new JSONArray(); for(Profile profile:profiles) list.put(profile.json());
+        Set<String> serials=new HashSet<>();
+        JSONArray list=new JSONArray();for(Profile profile:profiles) {
+            profile.updateName();
+            if(profile.kind.equals("eid")&&!serials.add(profile.documentNumber))throw new IOException("Seriennummer bereits vergeben: "+profile.documentNumber);
+            list.put(profile.json());
+        }
         for(Profile profile:profiles)if(!originals.containsKey(profile.id)) {
             JSONObject baseline=profile.json();
             if(profile.baselineGroups!=null)baseline.put("groups",profile.baselineGroups);
@@ -106,6 +129,8 @@ final class ProfileStore {
         String baseline=originals.get(profile.id);
         if(baseline==null)throw new IOException("Ausgangsstand nicht verfügbar");
         Profile restored=Profile.parse(new JSONObject(baseline));
+        restored.documentNumber=profile.documentNumber;
+        restored.nativeName=profile.nativeName;
         restored.signedFixture=profile.signedFixture;restored.passportCatalog=profile.passportCatalog;
         restored.simulatable=profile.simulatable;restored.simulationError=profile.simulationError;
         restored.personalizationGeneration=UUID.randomUUID().toString();
@@ -132,6 +157,7 @@ final class ProfileStore {
         Profile imported=Profile.parse(new JSONObject(source));
         if(ownCount()>=100) throw new IOException("Maximal 100 eigene Profile");
         for(Profile profile:profiles) if(profile.id.equals(imported.id)) throw new IOException("Profil-ID bereits vorhanden; bestehendes Profil bleibt erhalten");
+        if(imported.kind.equals("eid")&&bySerial(imported.documentNumber)!=null)throw new IOException("Seriennummer bereits vergeben: "+imported.documentNumber);
         profiles.add(imported);
         try { save(); } catch(Exception error) { profiles.remove(imported); throw error; }
         return imported;

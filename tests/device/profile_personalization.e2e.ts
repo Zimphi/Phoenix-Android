@@ -3,7 +3,7 @@ import {expect} from 'e2e';
 const button=(s:any,label:string)=>s.getByRole('group').filter({hasText:label,has:s.getByRole('button')}).last().getByRole('button');
 
 test('eID restores personalization and retains it after relaunch',{timeout:180_000},async({app,screen,device})=>{
- async function open(){await device.openApp('de.phoenix.simulator',{relaunch:true});await screen.getByText('eID',{exact:true}).tap();await screen.getByText('Max Mustermann',{exact:true}).tap();}
+ async function open(){await device.openApp('de.phoenix.simulator',{relaunch:true});await screen.getByText('eID',{exact:true}).tap();await screen.getByTestId('profile-eid-max').tap();}
  await open();
  await screen.getByText('Einstellungen',{exact:true}).tap();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Personalisierungsdaten zurücksetzen',{exact:true}));

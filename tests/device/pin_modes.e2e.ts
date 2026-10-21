@@ -5,13 +5,12 @@ import { expect } from 'e2e';
 
 test('transport PIN and inactive eID remain separate and persist', { timeout: 180_000 }, async ({ app, screen, device }) => {
   await device.openApp('de.phoenix.simulator',{relaunch:true});
-  const savedName='Max Mustermann';
   const testPuk=String(Date.now()%10_000_000_000).padStart(10,'0');
   const field=(label:string)=>screen.getByRole('textbox').filter({has:screen.getByText(label,{exact:true})});
   const openEditor=async()=>{
     await screen.getByTestId('nav-Profile').getByText('Profile',{exact:true}).tap();
     await screen.getByText('eID',{exact:true}).tap();
-    await screen.getByText(savedName,{exact:true}).tap();
+    await screen.getByTestId('profile-eid-max').tap();
     await screen.getByText('Einstellungen',{exact:true}).tap();
   };
   const toggle=(label:string)=>screen.getByRole('group',{name:label,exact:true});
@@ -63,6 +62,6 @@ test('transport PIN and inactive eID remain separate and persist', { timeout: 18
     await screen.getByText('Änderungen speichern',{exact:true}).tap();
     await screen.getByTestId('nav-Profile').getByText('Profile',{exact:true}).tap();
     await screen.getByText('eID',{exact:true}).tap();
-    await expect(screen.getByText('Max Mustermann',{exact:true})).toBeVisible();
+    await expect(screen.getByText('MUSTERMANN',{exact:true}).first()).toBeVisible();
   }
 });

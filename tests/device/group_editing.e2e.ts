@@ -16,7 +16,7 @@ test('originals offer an editable copy without changing the original when cancel
 test('own eID birth place opens as plain text and cancellation preserves it',async({app,screen,device})=>{
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('eID',{exact:true}).tap();
- await screen.getByText('Max Mustermann',{exact:true}).tap();
+ await screen.getByTestId('profile-eid-max').tap();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Geburtsort',{exact:true}));
  await screen.getByText('Geburtsort',{exact:true}).tap();
  await expect(screen.getByText('DG9 · Geburtsort',{exact:true})).toBeVisible();
@@ -34,7 +34,7 @@ test('own eID birth place opens as plain text and cancellation preserves it',asy
 
 test('own eID data changes persist after relaunch and can be restored',{timeout:180_000},async({app,screen,device})=>{
  const button=(label:string)=>screen.getByRole('group').filter({hasText:label,has:screen.getByRole('button')}).last().getByRole('button');
- async function open(){await device.openApp('de.phoenix.simulator',{relaunch:true});await screen.getByText('eID',{exact:true}).tap();await screen.getByText('Max Mustermann',{exact:true}).tap();}
+ async function open(){await device.openApp('de.phoenix.simulator',{relaunch:true});await screen.getByText('eID',{exact:true}).tap();await screen.getByTestId('profile-eid-max').tap();}
  async function edit(value:string){
   await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Geburtsort',{exact:true}));
   await screen.getByText('Geburtsort',{exact:true}).tap();

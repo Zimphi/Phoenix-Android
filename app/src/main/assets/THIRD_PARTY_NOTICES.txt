@@ -30,3 +30,5 @@ https://github.com/zxing/zxing
 Camera frames are decoded locally.
 
 Offline country catalogue: Zimphi/CountryCode-ISO-3166-1-alpha-3-, revision 3c037c9c2b67d0119d5b3a5c54294ac2a7e0dd52. Data and German names: Debian iso-codes / pycountry, LGPL-2.1-or-later. Source and hash: countries.lock.json. Licence: LGPL-2.1.txt.
+
+Offline municipality catalogue: OpenPLZ / openpotato/openplzapi.data, source src/de/osm/streets.csv, revision c26389b30573ab2738d0b14fd350f143aa0a1251. Derived PLZ/Ort/AGS mapping dated 2026-08-28, ODbL-1.0. Source: https://github.com/openpotato/openplzapi.data. Full licence: ODbL-1.0.txt. Lookup runs locally and uses postal code and municipality, without sending addresses to a server.

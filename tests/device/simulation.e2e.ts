@@ -3,12 +3,13 @@ import { resolve } from 'node:path';
 import { test } from '@e2e-dev/mobile';
 import { expect } from 'e2e';
 
-for (const name of ['Erika Mustermann', 'Max Mustermann', 'PersoSim 01 Testausweis', 'PersoSim 03 Testausweis']) {
+for (const [name,id] of [['Erika Mustermann','passport-erika'],['MUSTERMANN','eid-max'],['PersoSim 01','eid-persosim01'],['PersoSim 03','eid-persosim03']]) {
   test(`${name} starts and stops the real local simulation`, { timeout: 90_000 }, async ({ app, screen }) => {
     await app.open();
     await screen.getByTestId('nav-Profile').getByText('Profile', { exact: true }).tap();
     await screen.getByText(name.startsWith('Erika') ? 'ePassport' : 'eID', { exact: true }).tap();
-    await screen.getByText(name, { exact: true }).tap();
+    await screen.getByTestId('profile-list').scrollUntilVisible(screen.getByTestId(`profile-${id}`));
+    await screen.getByTestId(`profile-${id}`).tap();
     if (name.startsWith('PersoSim')) {
       await expect(screen.getByText('eID · Signiertes PersoSim-Profil', { exact: true })).toBeVisible();
       await screen.getByText('Datengruppen', { exact: true }).tap();

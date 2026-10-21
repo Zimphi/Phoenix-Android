@@ -19,7 +19,7 @@ if(process.env.PHOENIX_IFD_DESKTOP_DIR) {
    await screen.getByText('Kopplung beenden',{exact:true}).tap();
    await screen.getByTestId('nav-Profile').getByText('Profile',{exact:true}).tap();
    await screen.getByText('eID',{exact:true}).tap();
-   await screen.getByText('PersoSim 03 Testausweis',{exact:true}).tap();
+   await screen.getByTestId('profile-eid-persosim03').tap();
    await screen.getByTestId('nav-Simulation').getByText('Simulation',{exact:true}).tap();
    await screen.getByRole('radio').nth(1).tap();
    const start=async()=>{
