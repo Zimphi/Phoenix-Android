@@ -97,7 +97,11 @@ internal class PkiDevice(private val context:Context) {
             .remove("pending_code").remove("pending_alias").commit()){"Gerätezuordnung konnte nicht gespeichert werden"}
         return "Gerät registriert. Zentralen PKI-Status prüfen."
     }
-    @Synchronized fun identity():JSONObject=runCatching{JSONObject(preferences.getString("account","{}")?:"{}")}.getOrDefault(JSONObject()).put("user_id",userId()?:"")
+    // Snapshot getters must not wait for a synchronized HTTPS operation on the UI thread.
+    fun identity():JSONObject {
+        val saved=preferences.all
+        return runCatching{JSONObject(saved["account"] as? String?:"{}")}.getOrDefault(JSONObject()).put("user_id",saved["user_id"] as? String?:"")
+    }
     companion object {
         internal fun identityFromStatus(result:JSONObject):JSONObject {
             check(result.getBoolean("authenticated")){"Geräteanmeldung fehlgeschlagen"}
@@ -113,10 +117,10 @@ internal class PkiDevice(private val context:Context) {
             return identity
         }
     }
-    @Synchronized fun userId()=preferences.getString("user_id",null)
-    @Synchronized fun environment()=preferences.getString("environment",null)
-    @Synchronized fun connected()=preferences.contains("id")
-    @Synchronized fun hasLocalKey()=connected()||preferences.contains("pending_alias")
+    fun userId()=preferences.getString("user_id",null)
+    fun environment()=preferences.getString("environment",null)
+    fun connected()=preferences.contains("id")
+    fun hasLocalKey()=connected()||preferences.contains("pending_alias")
     @Synchronized fun forget():String {
         // A lost server response must not trap an unusable local connection.
         listOf("alias","pending_alias").mapNotNull{preferences.getString(it,null)}.distinct().forEach{store().deleteEntry(it)}

@@ -27,6 +27,7 @@ import org.json.JSONObject
 class MainActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
+        if(android.os.Build.VERSION.SDK_INT>=31)splashScreen.setOnExitAnimationListener{it.remove()}
         setContent { MaterialTheme(typography=PhoenixTypography,colorScheme=lightColorScheme(primary=Blue,onPrimary=androidx.compose.ui.graphics.Color.White,background=Page,surface=Page,onSurface=Navy)) { ProvideTextStyle(TextStyle(fontFamily=PhoenixFont,fontSize=14.sp,lineHeight=TextUnit.Unspecified,letterSpacing=0.sp)) { Phoenix() } } }
     }
     override fun onResume(){super.onResume();CardService.foreground(true);val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,CardService::class.java))}
@@ -42,8 +43,8 @@ class MainActivity:ComponentActivity() {
     val userId=identity.optString("user_id").takeIf{it.isNotBlank()}
     var cloudVerified by remember{mutableStateOf(false)}
     var accountBusy by remember{mutableStateOf(false)}
-    val storeResult=remember{runCatching{ProfileStore(context)}}
-    val store=storeResult.getOrNull()
+    var storeResult by remember{mutableStateOf<Result<ProfileStore>?>(null)}
+    val store=storeResult?.getOrNull()
     var page by remember{mutableStateOf("Profile")}
     var selected by remember{mutableStateOf<Profile?>(null)}
     var selectedKind by remember{mutableStateOf("eid")}
@@ -72,13 +73,20 @@ class MainActivity:ComponentActivity() {
                 val applied=state.optJSONObject("draft_settings")
                 applied!=null&&applied.keys().asSequence().all{key->profile.settings.opt(key)==applied.opt(key)}
             }?.let{settings->
-                val old=profile.settings;profile.settings=settings;profile.ri=state.optJSONObject("ri")
-                runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++}.onFailure{profile.settings=old;message=it.message}
+                val ri=state.optJSONObject("ri")
+                val unchanged=settings.length()==profile.settings.length()&&settings.keys().asSequence().all{key->settings.opt(key)==profile.settings.opt(key)}&&ri?.toString()==profile.ri?.toString()
+                if(!unchanged) {
+                    val old=profile.settings;profile.settings=settings;profile.ri=ri
+                    runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++}.onFailure{profile.settings=old;message=it.message}
+                }
             }
         }
     }}
     LaunchedEffect(Unit) {
         val began=android.os.SystemClock.uptimeMillis()
+        storeResult=withContext(Dispatchers.IO){runCatching{
+            DocumentImages.warm(context);CountryCodes.load(context);ProfileStore(context)
+        }}
         val initialization=withContext(Dispatchers.IO){
             runCatching {
                 check(NativeCore.available){"Native Core-Bibliothek fehlt"}
@@ -120,7 +128,10 @@ class MainActivity:ComponentActivity() {
             }.onFailure{message="Export fehlgeschlagen: ${it.message}"}
         }
     }
-    if(store==null){Box(Modifier.fillMaxSize().background(Page).padding(24.dp)){Text("Profilspeicher nicht lesbar. Vorhandene Daten bleiben erhalten.",color=Navy)};return}
+    if(store==null){
+        if(startup)Startup() else Box(Modifier.fillMaxSize().background(Page).padding(24.dp)){Text("Profilspeicher nicht lesbar. Vorhandene Daten bleiben erhalten.",color=Navy)}
+        return
+    }
     fun exportProfile(profile:Profile) {
         val snapshot=Profile.parse(profile.json()).apply{baselineGroups=profile.baselineGroups}
         scope.launch {
@@ -213,7 +224,10 @@ class MainActivity:ComponentActivity() {
         val old=profile.name;val previous=profile.settings;profile.name=value;profile.settings=settings
         return runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++}.onFailure{profile.name=old;profile.settings=previous;message=it.message}.isSuccess
     }
-    LaunchedEffect(page){cloudVerified=false;identity=account.identity();if(account.connected())withContext(Dispatchers.IO){runCatching{account.status()}}.onSuccess{identity=account.identity();cloudVerified=account.verifiedConnection()}}
+    LaunchedEffect(page){
+        identity=account.identity();cloudVerified=account.verifiedConnection()
+        if(account.connected()&&!cloudVerified)withContext(Dispatchers.IO){runCatching{account.status()}}.onSuccess{identity=account.identity();cloudVerified=account.verifiedConnection()}
+    }
     val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
     if(startup){Startup();return}
     Column(Modifier.fillMaxSize().background(Page).statusBarsPadding().semantics{testTagsAsResourceId=true}) {

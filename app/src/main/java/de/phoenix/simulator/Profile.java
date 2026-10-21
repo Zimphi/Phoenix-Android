@@ -96,7 +96,8 @@ final class Profile {
         return raw;
     }
     JSONObject coreDraft() throws JSONException {
-        JSONObject effective=new JSONObject(groups.toString());
+        JSONObject effective=new JSONObject();
+        for(java.util.Iterator<String> it=groups.keys();it.hasNext();){String key=it.next();effective.put(key,groups.get(key));}
         if(kind.equals("eid")&&!java.util.Arrays.asList("AR","AS","AF").contains(documentType())) {
             effective.remove("DG19");effective.remove("DG20");
         }

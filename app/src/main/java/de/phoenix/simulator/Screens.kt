@@ -173,20 +173,24 @@ import org.json.JSONObject
     val save={onSave(profile.name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))}
     var displayedGroups by remember(profile){mutableStateOf(profile.groups)}
     var displayedMrz by remember(profile){mutableStateOf("")}
+    var displayedPassportDetails by remember(profile){mutableStateOf(JSONObject())}
     var displayedPortrait by remember(profile){mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)}
     LaunchedEffect(profile.id,revision,profile.groups.toString()) {
-        val draft=profile.coreDraft()
-        val description=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){runCatching{
-            NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))
+        val result=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){runCatching{
+            val description=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",profile.coreDraft()))
+            val image=description.optString("portrait").takeIf{it.isNotBlank()&&it!="null"}?.let{decodePortrait(it)}
+            description to image
         }.getOrNull()}
+        val description=result?.first
         displayedGroups=description?.optJSONObject("groups")?:profile.groups
         displayedMrz=description?.optString("mrz")?:""
-        displayedPortrait=description?.optString("portrait")?.takeIf{it.isNotBlank()&&it!="null"}?.let{runCatching{decodePortrait(it)}.getOrNull()}
+        displayedPassportDetails=description?.optJSONObject("supplementary")?:JSONObject()
+        displayedPortrait=result?.second
     }
     LaunchedEffect(can,pin,puk,retries,uses,transport,eidActive) {
         if(valid&&!profile.passportCatalog) {
             val settings=JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive)
-            if(settings.toString()!=profile.settings.toString())onSave(profile.name,settings)
+            if(settings.length()!=profile.settings.length()||settings.keys().asSequence().any{key->settings.opt(key)!=profile.settings.opt(key)})onSave(profile.name,settings)
         }
     }
     if(reset)AlertDialog(onDismissRequest={reset=false},title={Text("Personalisierungsdaten zurücksetzen?")},text={Text("Datengruppen, Zugangsdaten und Dokumentdarstellung werden auf den gesicherten Ausgangsstand dieses Profils zurückgesetzt. Änderungen gehen verloren.")},confirmButton={TextButton({reset=false;onReset()}){Text("Zurücksetzen")}},dismissButton={TextButton({reset=false}){Text("Abbrechen")}})
@@ -198,7 +202,7 @@ import org.json.JSONObject
             IconButton({if(profile.passportCatalog||save())onSimulate()},enabled=valid,modifier=Modifier.semantics{contentDescription="Profil in Simulation übernehmen"}){Box(Modifier.size(28.dp).background(Color(0xffe7eef6),androidx.compose.foundation.shape.CircleShape),contentAlignment=Alignment.Center){Glyph("play",Navy,Modifier.size(15.dp))}}
         }
         Box(Modifier.fillMaxWidth().testTag("document-preview-frame").aspectRatio(if(profile.kind=="epassport")720f/550f else 856f/540f)) {
-            DocumentPreview(profile,displayedGroups,Modifier.fillMaxSize().clickable(role=Role.Button,onClickLabel=if(back)"Vorderseite anzeigen" else if(profile.kind=="epassport")"Zweite Passseite anzeigen" else "Rückseite anzeigen"){back=!back},mrz=displayedMrz,portraitOverride=portrait,back=back)
+            DocumentPreview(profile,displayedGroups,Modifier.fillMaxSize().clickable(role=Role.Button,onClickLabel=if(back)"Vorderseite anzeigen" else if(profile.kind=="epassport")"Zweite Passseite anzeigen" else "Rückseite anzeigen"){back=!back},mrz=displayedMrz,portraitOverride=portrait,back=back,passportImage=displayedPortrait,passportDetails=displayedPassportDetails)
         }
         if(profile.kind=="eid") {
             val warnings=buildList {

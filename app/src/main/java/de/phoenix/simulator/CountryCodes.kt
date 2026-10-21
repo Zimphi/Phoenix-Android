@@ -22,12 +22,14 @@ internal data class CountryCode(val name:String,val alpha2:String,val alpha3:Str
     fun hasCode(code:String)=code.isNotBlank()&&(code.equals(mrz,ignoreCase=true)||code.equals(alpha3,ignoreCase=true)||code.trimEnd('<').equals(icao,ignoreCase=true))
 }
 internal object CountryCodes {
-    fun load(context:Context):List<CountryCode> {
+    private var cached:List<CountryCode>?=null
+    @Synchronized fun load(context:Context):List<CountryCode> {
+        cached?.let{return it}
         val data=context.assets.open("icao_countries_DE.json").use{JSONArray(ProfileStore.read(it))}
-        return (0 until data.length()).map{index->
+        return ((0 until data.length()).map{index->
             val row=data.getJSONObject(index)
             CountryCode(row.getString("name"),row.getString("iso_alpha2"),row.getString("iso_alpha3"),row.getString("icao_9303_code"),row.getString("mrz_value"))
-        }+CountryCode("Utopia (synthetisch)","","","UTO","UTO")
+        }+CountryCode("Utopia (synthetisch)","","","UTO","UTO")).also{cached=it}
     }
 }
 @Composable internal fun CountryField(label:String,code:String,countries:List<CountryCode>,modifier:Modifier=Modifier,onClick:()->Unit) {

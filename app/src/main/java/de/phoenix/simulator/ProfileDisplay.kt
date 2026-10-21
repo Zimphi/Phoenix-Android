@@ -109,16 +109,16 @@ internal fun td1FromTd3(td3:String,type:String):String {
 }
 
 /** Schematic document view; every displayed field comes from the selected profile. */
-@Composable internal fun DocumentPreview(profile:Profile,groups:JSONObject=profile.groups,modifier:Modifier=Modifier,compact:Boolean=false,mrz:String="",portraitOverride:String=profile.portraitSex,back:Boolean=false) {
+@Composable internal fun DocumentPreview(profile:Profile,groups:JSONObject=profile.groups,modifier:Modifier=Modifier,compact:Boolean=false,mrz:String="",portraitOverride:String=profile.portraitSex,back:Boolean=false,passportImage:ImageBitmap?=null,passportDetails:JSONObject?=null) {
     val passport=profile.kind=="epassport"
-    if(passport){val display=passportDisplay(profile);PassportPreview(profile,display?.groups?:groups,modifier,compact,display?.mrz?:mrz,display?.image,back,display?.supplementary?:JSONObject());return}
+    if(passport){PassportPreview(profile,groups,modifier,compact,mrz,passportImage,back,passportDetails?:JSONObject());return}
     val context=LocalContext.current
     val countries=remember{CountryCodes.load(context)}
     val sex=portraitOverride.ifEmpty{portraitSex(profile,groups)}
     val portrait=portraitBitmap(sex)
-    val watermark=remember{BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap()}
-    val paper=remember(back,profile.documentType()){BitmapFactory.decodeResource(context.resources,if(back||profile.documentType()=="UB"||residenceDocument(profile.documentType()))R.drawable.document_back_paper else R.drawable.document_paper).asImageBitmap()}
-    val identityMrz=identityMrz(profile,groups,countries)
+    val watermark=remember{DocumentImages.load(context,R.drawable.phoenix_wordmark)}
+    val paper=remember(back,profile.documentType()){DocumentImages.load(context,if(back||profile.documentType()=="UB"||residenceDocument(profile.documentType()))R.drawable.document_back_paper else R.drawable.document_paper)}
+    val identityMrz=if(compact)"" else identityMrz(profile,groups,countries)
     val issuer=profileField(profile,groups,"issuing_state")
     val country=if(issuer in listOf("D","D<<","DEU"))"BUNDESREPUBLIK DEUTSCHLAND" else countries.firstOrNull{it.hasCode(issuer)}?.name?:issuer
     Canvas(modifier.testTag("identity-portrait-${sex.ifEmpty{"auto"}}").semantics{contentDescription=(when{profile.documentType()=="UB"->"eID-Karte";residenceDocument(profile.documentType())->"Aufenthaltstitel";else->"Personalausweis"})+(if(back)" Rückseite" else " Vorderseite")+" · Seriennummer ${profile.documentNumber}"}) {
@@ -139,8 +139,8 @@ internal fun passportDate(raw:String)=if(raw.matches(Regex("[0-9]{6}")))"${raw.s
     val countries=remember{CountryCodes.load(context)}
     val data=runCatching{JSONObject(groups.optString("DG1"))}.getOrDefault(JSONObject())
     val fallback=portraitBitmap(portraitSex(profile,groups))
-    val watermark=remember{BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap()}
-    val paper=remember{BitmapFactory.decodeResource(context.resources,R.drawable.document_paper).asImageBitmap()}
+    val watermark=remember{DocumentImages.load(context,R.drawable.phoenix_wordmark)}
+    val paper=remember{DocumentImages.load(context,R.drawable.document_paper)}
     val code=data.optString("issuing_state")
     val country=if(code in listOf("D","D<<","DEU"))"BUNDESREPUBLIK DEUTSCHLAND" else countries.firstOrNull{it.hasCode(code)}?.name?:code
     if(back) {
@@ -162,11 +162,10 @@ internal fun passportDate(raw:String)=if(raw.matches(Regex("[0-9]{6}")))"${raw.s
 
 private data class PassportDisplay(val groups:JSONObject,val mrz:String,val image:ImageBitmap?,val supplementary:JSONObject)
 @Composable private fun passportDisplay(profile:Profile):PassportDisplay? {
-    val draft=profile.coreDraft()
     var result by remember(profile.id,profile.groups.toString()){mutableStateOf<PassportDisplay?>(null)}
     LaunchedEffect(profile.id,profile.groups.toString()) {
         result=withContext(Dispatchers.IO){runCatching {
-            val description=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))
+            val description=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",profile.coreDraft()))
             val encoded=description.optString("portrait")
             val image=if(encoded.isEmpty()||encoded=="null")null else decodePortrait(encoded)
             PassportDisplay(description.getJSONObject("groups"),description.optString("mrz"),image,description.optJSONObject("supplementary")?:JSONObject())

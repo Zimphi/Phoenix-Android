@@ -1,6 +1,6 @@
 package de.phoenix.simulator
 
-import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +42,7 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
 
 @Composable internal fun Brand(modifier:Modifier=Modifier) {
     val context=LocalContext.current
-    val image=remember { BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap() }
+    val image=remember { DocumentImages.load(context,R.drawable.phoenix_wordmark) }
     Canvas(modifier.semantics { contentDescription="Phoenix Logo" }) {
         phoenixBird(image)
     }
@@ -59,7 +59,7 @@ internal fun DrawScope.phoenixBird(image:ImageBitmap,origin:Offset=Offset.Zero,b
 @Composable internal fun portraitBitmap(sex:String):ImageBitmap? {
     val context=LocalContext.current
     val resource=when(sex){"M"->R.drawable.portrait_male;"F"->R.drawable.portrait_female;else->null}
-    return remember(resource){resource?.let{BitmapFactory.decodeResource(context.resources,it,BitmapFactory.Options().apply{inSampleSize=2}).asImageBitmap()}}
+    return remember(resource){resource?.let{DocumentImages.load(context,it)}}
 }
 
 @Composable internal fun AccountAvatar(modifier:Modifier=Modifier) {
@@ -67,12 +67,14 @@ internal fun DrawScope.phoenixBird(image:ImageBitmap,origin:Offset=Offset.Zero,b
 }
 
 @Composable internal fun Startup() {
-    Column(Modifier.fillMaxSize().background(Page).testTag("phoenix-startup"),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-        Brand(Modifier.size(210.dp,244.dp))
-        Spacer(Modifier.height(24.dp))
-        Text("Phoenix",color=Navy,fontSize=38.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-1).sp)
-        Spacer(Modifier.height(8.dp))
-        Text("eID & ePassport Simulator",color=Muted,fontSize=14.sp)
+    Box(Modifier.fillMaxSize().background(Page).testTag("phoenix-startup"),contentAlignment=Alignment.Center) {
+        // Match Android 12's 288dp icon canvas and the 20% inset in phoenix_splash.xml.
+        Image(painterResource(R.drawable.phoenix_favicon),contentDescription="Phoenix Logo",
+            modifier=Modifier.size(288.dp).padding(57.6.dp).testTag("phoenix-launch-logo"))
+        Column(Modifier.offset(y=174.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text("Phoenix",color=Navy,fontSize=38.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-1).sp)
+            Text("eID & ePassport Simulator",color=Muted,fontSize=14.sp)
+        }
     }
 }
 
@@ -126,7 +128,7 @@ internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size
 
 @Composable internal fun Art(kind:String,modifier:Modifier=Modifier) {
     val context=LocalContext.current
-    val logo=if(kind=="nfc"||kind=="eid")remember { BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap() }else null
+    val logo=if(kind=="nfc"||kind=="eid")remember { DocumentImages.load(context,R.drawable.phoenix_wordmark) }else null
     val portrait=if(kind=="eid")portraitBitmap("F")else null
     Canvas(modifier) {
         val factor=minOf(size.width,size.height)/160f

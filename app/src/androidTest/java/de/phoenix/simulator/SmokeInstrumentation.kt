@@ -16,10 +16,30 @@ class SmokeInstrumentation:Instrumentation() {
     private var importDraft:String?=null
     private var pki=false
     private var auditCommunity=false
-    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";pki=arguments?.getString("pki")=="true";auditCommunity=arguments?.getString("auditCommunity")=="true";importDraft=arguments?.getString("importDraft");start()}
+    private var performance=false
+    override fun onCreate(arguments:Bundle?){super.onCreate(arguments);activation=arguments?.getString("activation")=="true";pki=arguments?.getString("pki")=="true";auditCommunity=arguments?.getString("auditCommunity")=="true";importDraft=arguments?.getString("importDraft");performance=arguments?.getString("performance")=="true";start()}
     override fun onStart(){
         val result=Bundle()
         try{
+            if(performance) {
+                DocumentImages.warm(targetContext)
+                check(DocumentImages.load(targetContext,R.drawable.document_paper)===DocumentImages.load(targetContext,R.drawable.document_paper))
+                check(CountryCodes.load(targetContext)===CountryCodes.load(targetContext))
+                val draftProfile=Profile.parse(Profile.defaults().getJSONObject(1))
+                val draft=draftProfile.coreDraft();draftProfile.groups.put("DG4","CHANGED")
+                check(draft.getJSONObject("groups").getString("DG4")=="MAX")
+                val device=PkiDevice(targetContext)
+                val entered=java.util.concurrent.CountDownLatch(1);val release=java.util.concurrent.CountDownLatch(1)
+                val worker=Thread{synchronized(device){entered.countDown();release.await(3,java.util.concurrent.TimeUnit.SECONDS)}}
+                val pool=java.util.concurrent.Executors.newSingleThreadExecutor()
+                worker.start();check(entered.await(1,java.util.concurrent.TimeUnit.SECONDS))
+                try {
+                    pool.submit(java.util.concurrent.Callable{device.identity();device.userId();device.environment();device.connected();device.hasLocalKey();device.verifiedConnection()})
+                        .get(300,java.util.concurrent.TimeUnit.MILLISECONDS)
+                } finally {release.countDown();worker.join();pool.shutdownNow()}
+                result.putString("stream","Shared artwork/country data, isolated draft snapshots and nonblocking account snapshots passed.")
+                finish(Activity.RESULT_OK,result);return
+            }
             if(auditCommunity) {
                 val store=ProfileStore(targetContext)
                 val profiles=store.profiles.filter{it.kind=="eid"}
