@@ -9,14 +9,22 @@ final class Profile {
     final String id;
     final String kind;
     String name;
+    String portraitSex="";
+    String pkiInfrastructure="";
+    String persosimSource="";
+    String personalizationGeneration="";
+    String documentNumber="";
     boolean signedFixture;
     boolean passportCatalog;
     boolean simulatable=true;
     String simulationError="";
+    JSONObject ri;
+    JSONObject baselineGroups;
     JSONObject groups;
     JSONObject settings;
     Profile(String id, String kind, String name, JSONObject groups) {
         this.id = id; this.kind = kind; this.name = name; this.groups = groups;
+        this.documentNumber=String.format(java.util.Locale.ROOT,"T%08X",id.hashCode());
         try { this.settings=new JSONObject().put("can","123456").put("pin","123456").put("puk","1234567890"); }
         catch(JSONException error) { throw new IllegalStateException(error); }
     }
@@ -31,6 +39,24 @@ final class Profile {
         }
         if (groups.length()>22) throw new JSONException("Zu viele Datengruppen");
         Profile profile=new Profile(id,kind,name,groups);
+        profile.ri=value.optJSONObject("ri");
+        profile.baselineGroups=value.optJSONObject("baseline_groups");
+        if(profile.baselineGroups!=null) {
+            if(profile.baselineGroups.length()>22)throw new JSONException("Zu viele Ausgangs-Datengruppen");
+            for(java.util.Iterator<String> it=profile.baselineGroups.keys();it.hasNext();) {
+                String key=it.next();if(!key.matches("DG([1-9]|1[0-9]|2[0-2])")||profile.baselineGroups.getString(key).length()>65536)throw new JSONException("Ungültige Ausgangs-Datengruppe");
+            }
+        }
+        profile.persosimSource=value.optString("persosim_source","");
+        if(!profile.persosimSource.isEmpty()&&(!kind.equals("eid")||!profile.persosimSource.matches("[a-zA-Z0-9_-]{1,64}")))throw new JSONException("Ungültiges PersoSim-Ausgangsprofil");
+        profile.pkiInfrastructure=value.optString("pki_infrastructure","");
+        if(!java.util.Arrays.asList("","bsi","phoenix").contains(profile.pkiInfrastructure)||kind.equals("epassport")&&profile.pkiInfrastructure.equals("bsi"))throw new JSONException("Unbekannte PKI-Testinfrastruktur");
+        profile.personalizationGeneration=value.optString("personalization_generation","");
+        if(!profile.personalizationGeneration.isEmpty()&&!java.util.UUID.fromString(profile.personalizationGeneration).toString().equals(profile.personalizationGeneration))throw new JSONException("Ungültiger Personalisierungsstand");
+        profile.documentNumber=value.optString("document_number",profile.documentNumber);
+        if(!profile.documentNumber.matches("[A-Z0-9]{1,9}"))throw new JSONException("Ungültige Dokumentnummer");
+        profile.portraitSex=value.optString("portrait_sex","");
+        if(!profile.portraitSex.matches("M|F|"))throw new JSONException("Ungültige Porträtdarstellung");
         if(value.has("settings")) {
             JSONObject settings=value.getJSONObject("settings");
             boolean transport=settings.optBoolean("transport_pin",false),eidActive=settings.optBoolean("eid_active",true);
@@ -44,10 +70,34 @@ final class Profile {
         return profile;
     }
     JSONObject json() throws JSONException {
-        return new JSONObject().put("format","phoenix-android-draft-v1").put("id",id).put("kind",kind).put("name",name).put("groups",groups).put("settings",settings);
+        JSONObject value=coreDraft().put("groups",groups);
+        if(!portraitSex.isEmpty())value.put("portrait_sex",portraitSex);
+        if(kind.equals("eid"))value.put("document_number",documentNumber);
+        return value;
+    }
+    String documentType() {
+        String raw=groups.optString("DG1","ID");
+        try { if(raw.startsWith("{")) return new JSONObject(raw).optString("Text","ID"); }
+        catch(JSONException ignored) { return raw; }
+        return raw;
+    }
+    JSONObject coreDraft() throws JSONException {
+        JSONObject effective=new JSONObject(groups.toString());
+        if(kind.equals("eid")&&!java.util.Arrays.asList("AR","AS","AF").contains(documentType())) {
+            effective.remove("DG19");effective.remove("DG20");
+        }
+        JSONObject draft=new JSONObject().put("format","phoenix-android-draft-v1").put("id",id).put("kind",kind).put("name",name).put("groups",effective).put("settings",settings);
+        if(ri!=null&&kind.equals("eid"))draft.put("ri",ri);
+        if(baselineGroups!=null&&kind.equals("eid"))draft.put("baseline_groups",baselineGroups);
+        if(!persosimSource.isEmpty())draft.put("persosim_source",persosimSource);
+        if(!pkiInfrastructure.isEmpty())draft.put("pki_infrastructure",pkiInfrastructure);
+        if(!personalizationGeneration.isEmpty())draft.put("personalization_generation",personalizationGeneration);
+        return draft;
     }
     JSONObject editableCopy() throws JSONException {
         JSONObject copy=new JSONObject(json().toString());
+        if(signedFixture)copy.put("persosim_source",id);
+        copy.remove("ri");copy.remove("baseline_groups");copy.remove("pki_infrastructure");copy.remove("personalization_generation");
         copy.put("id",kind+"-copy-"+java.util.UUID.randomUUID());
         copy.put("name",name.substring(0,Math.min(name.length(),110))+" · Kopie");
         if(kind.equals("epassport"))copy.getJSONObject("settings").put("pin","123456").put("puk","1234567890");

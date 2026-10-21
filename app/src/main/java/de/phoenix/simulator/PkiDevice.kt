@@ -22,6 +22,8 @@ import javax.net.ssl.HttpsURLConnection
 
 /** Independent installation identity; no user-auth prompt, private key never exported. */
 internal class PkiDevice(private val context:Context) {
+    @Volatile private var verifiedAt=0L
+    fun verifiedConnection()=connected()&&verifiedAt>0&&android.os.SystemClock.elapsedRealtime()-verifiedAt<300000
     private val preferences=context.getSharedPreferences("phoenix-pki-device-v1",Context.MODE_PRIVATE)
     private fun store()=KeyStore.getInstance("AndroidKeyStore").apply{load(null)}
     private fun b64(value:ByteArray)=Base64.encodeToString(value,Base64.NO_WRAP)
@@ -133,9 +135,11 @@ internal class PkiDevice(private val context:Context) {
             "X-Phoenix-Timestamp" to timestamp.toString(),"X-Phoenix-Signature" to signature))
     }
     @Synchronized fun status():String {
+        verifiedAt=0
         val result=authenticated("status")
         val identity=identityFromStatus(result)
         check(preferences.edit().putString("user_id",identity.getString("user_id")).putString("account",identity.toString()).commit()){"Benutzerkennung konnte nicht gespeichert werden"}
+        verifiedAt=android.os.SystemClock.elapsedRealtime()
         return if(result.optBoolean("pki_ready"))"Angemeldet · Zentrale PKI verfügbar" else "Angemeldet · Zentrale PKI noch nicht verfügbar"
     }
     @Synchronized fun disconnect():String {

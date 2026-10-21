@@ -44,12 +44,22 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
     val context=LocalContext.current
     val image=remember { BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap() }
     Canvas(modifier.semantics { contentDescription="Phoenix Logo" }) {
-        val source=IntOffset((image.width*.098).toInt(),(image.height*.163).toInt())
-        val dimensions=IntSize((image.width*.293).toInt(),(image.height*.677).toInt())
-        val factor=minOf(size.width/dimensions.width,size.height/dimensions.height)
-        val dest=IntSize((dimensions.width*factor).toInt(),(dimensions.height*factor).toInt())
-        drawImage(image,source,dimensions,IntOffset(((size.width-dest.width)/2).toInt(),((size.height-dest.height)/2).toInt()),dest,filterQuality=FilterQuality.High)
+        phoenixBird(image)
     }
+}
+
+internal fun DrawScope.phoenixBird(image:ImageBitmap,origin:Offset=Offset.Zero,bounds:Size=size,alpha:Float=1f) {
+    val source=IntOffset((image.width*.098).toInt(),(image.height*.163).toInt())
+    val dimensions=IntSize((image.width*.293).toInt(),(image.height*.677).toInt())
+    val factor=minOf(bounds.width/dimensions.width,bounds.height/dimensions.height)
+    val dest=IntSize((dimensions.width*factor).toInt(),(dimensions.height*factor).toInt())
+    drawImage(image,source,dimensions,IntOffset((origin.x+(bounds.width-dest.width)/2).toInt(),(origin.y+(bounds.height-dest.height)/2).toInt()),dest,alpha=alpha,filterQuality=FilterQuality.High)
+}
+
+@Composable internal fun portraitBitmap(sex:String):ImageBitmap? {
+    val context=LocalContext.current
+    val resource=when(sex){"M"->R.drawable.portrait_male;"F"->R.drawable.portrait_female;else->null}
+    return remember(resource){resource?.let{BitmapFactory.decodeResource(context.resources,it,BitmapFactory.Options().apply{inSampleSize=2}).asImageBitmap()}}
 }
 
 @Composable internal fun AccountAvatar(modifier:Modifier=Modifier) {
@@ -66,7 +76,14 @@ internal val PhoenixTypography=Typography().let { t -> t.copy(
     }
 }
 
-internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size.height) {
+internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size.height,portrait:ImageBitmap?=null) {
+    if(portrait!=null) {
+        drawRect(Brush.verticalGradient(listOf(Color(0xffe5e7e0),Color(0xffced6d0))),size=Size(width,height))
+        val factor=maxOf(width/portrait.width,height/portrait.height)
+        val crop=IntSize((width/factor).toInt(),(height/factor).toInt())
+        drawImage(portrait,IntOffset((portrait.width-crop.width)/2,(portrait.height-crop.height)/2),crop,dstSize=IntSize(width.toInt(),height.toInt()),filterQuality=FilterQuality.High)
+        return
+    }
     scale(width/100f,height/128f,pivot=Offset.Zero) {
         drawRect(Brush.verticalGradient(listOf(Color(0xffe7e8e2),Color(0xffc8d3d1))),size=Size(100f,128f))
         val head=Path().apply {
@@ -97,8 +114,8 @@ internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size
 
 @Composable internal fun Glyph(kind:String,color:Color=Muted,modifier:Modifier=Modifier.size(23.dp)) {
     val resource=when(kind) {
-        "Profile"->R.drawable.icon_house;"Simulation","play"->R.drawable.icon_play;"Über","info"->R.drawable.icon_info
-        "layers"->R.drawable.icon_layers;"add"->R.drawable.icon_circle_plus;"back"->R.drawable.icon_arrow_left;"chevron"->R.drawable.icon_chevron_right
+        "Profile"->R.drawable.icon_house_filled;"Simulation"->R.drawable.icon_scan;"play"->R.drawable.icon_play_filled;"Über","info"->R.drawable.icon_info
+        "person"->R.drawable.icon_user_round;"calendar"->R.drawable.icon_calendar;"place"->R.drawable.icon_map_pin;"layers"->R.drawable.icon_data_groups;"add"->R.drawable.icon_circle_plus;"back"->R.drawable.icon_arrow_left;"chevron"->R.drawable.icon_chevron_right
         "edit"->R.drawable.icon_pencil;"import"->R.drawable.icon_file_input;"export"->R.drawable.icon_file_output;"save"->R.drawable.icon_save;"cloud"->R.drawable.icon_cloud
         "privacy"->R.drawable.icon_shield_check;"legal"->R.drawable.icon_scale;"file"->R.drawable.icon_file_text;"eid"->R.drawable.icon_id_card
         "epassport"->R.drawable.icon_globe;"phone"->R.drawable.icon_smartphone;"contactless"->R.drawable.icon_contactless;"ifd"->R.drawable.icon_ifd;"wifi"->R.drawable.icon_wifi;"stop"->R.drawable.icon_square;"copy"->R.drawable.icon_copy
@@ -109,7 +126,8 @@ internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size
 
 @Composable internal fun Art(kind:String,modifier:Modifier=Modifier) {
     val context=LocalContext.current
-    val logo=if(kind=="nfc")remember { BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap() }else null
+    val logo=if(kind=="nfc"||kind=="eid")remember { BitmapFactory.decodeResource(context.resources,R.drawable.phoenix_wordmark).asImageBitmap() }else null
+    val portrait=if(kind=="eid")portraitBitmap("F")else null
     Canvas(modifier) {
         val factor=minOf(size.width,size.height)/160f
         translate((size.width-160f*factor)/2,(size.height-160f*factor)/2) {scale(factor,factor,pivot=Offset.Zero) {
@@ -137,7 +155,7 @@ internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size
             }
             "eid" -> rotate(-4f,Offset(100f,83f)) {
                 drawRoundRect(Navy.copy(alpha=.09f),Offset(16f,42f),Size(140f,88f),CornerRadius(5f))
-                translate(12f,37f){scale(140f/856f,88f/540f,pivot=Offset.Zero){identityDocument()}}
+                translate(12f,37f){scale(140f/856f,88f/540f,pivot=Offset.Zero){identityDocument(portrait=portrait,watermark=logo)}}
             }
             else -> {
                 drawCircle(Brush.radialGradient(listOf(Color(0xffe9edff),Color(0xfff3f5ff)),Offset(83f,81f),72f),72f,Offset(83f,81f))
@@ -181,9 +199,9 @@ internal fun DrawScope.identityPortrait(width:Float=size.width,height:Float=size
             for(name in listOf("Profile","Simulation","Über")) {
                 val chosen=name==active
                 Column(Modifier.weight(1f).fillMaxHeight().testTag("nav-$name").semantics{selected=chosen}.clickable(role=Role.Tab,onClick={onNavigate(name)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-                    Glyph(name,if(chosen)Blue else Muted)
-                    Spacer(Modifier.height(4.dp));Text(name,fontSize=11.sp,color=if(chosen)Blue else Muted)
-                    Spacer(Modifier.height(5.dp));Box(Modifier.size(23.dp,2.dp).background(if(chosen)Blue else Color.Transparent,RoundedCornerShape(1.dp)))
+                    Glyph(name,if(chosen)Navy else Muted)
+                    Spacer(Modifier.height(4.dp));Text(name,fontSize=11.sp,fontWeight=if(chosen)FontWeight.Bold else FontWeight.Medium,color=if(chosen)Navy else Muted)
+                    Spacer(Modifier.height(7.dp))
                 }
             }
         }

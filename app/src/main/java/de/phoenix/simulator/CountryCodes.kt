@@ -19,7 +19,7 @@ import org.json.JSONArray
 
 internal data class CountryCode(val name:String,val alpha2:String,val alpha3:String,val icao:String,val mrz:String) {
     fun matches(query:String)=listOf(name,alpha2,alpha3,icao,mrz).any{it.contains(query,ignoreCase=true)}
-    fun hasCode(code:String)=code.equals(mrz,ignoreCase=true)||code.equals(alpha3,ignoreCase=true)||code.trimEnd('<').equals(icao,ignoreCase=true)
+    fun hasCode(code:String)=code.isNotBlank()&&(code.equals(mrz,ignoreCase=true)||code.equals(alpha3,ignoreCase=true)||code.trimEnd('<').equals(icao,ignoreCase=true))
 }
 internal object CountryCodes {
     fun load(context:Context):List<CountryCode> {

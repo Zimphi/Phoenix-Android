@@ -41,18 +41,16 @@ import org.json.JSONObject
                 Field("document_number","Dokumentnummer",Modifier.weight(1f),9)
                 CountryField("Ausstellender Staat",fields.optString("issuing_state"),countries,Modifier.weight(1f)){countryField="issuing_state"}
             }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                CountryField("Staatsangehörigkeit",fields.optString("nationality"),countries,Modifier.weight(1f)){countryField="nationality"}
-                Field("sex","Geschlecht (M/F/<)",Modifier.weight(1f),1)
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                CountryField("Staatsangehörigkeit",fields.optString("nationality"),countries,Modifier.fillMaxWidth()){countryField="nationality"}
+                ChoiceField("Geschlecht",fields.optString("sex"),listOf("F" to "Weiblich","M" to "Männlich","<" to "Keine Angabe")){fields=JSONObject(fields.toString()).put("sex",it);valid=false}
             }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                Field("date_of_birth","Geburt (JJMMTT)",Modifier.weight(1f),6)
-                Field("date_of_expiry","Ablauf (JJMMTT)",Modifier.weight(1f),6)
-            }
+            DateFields("Geburtsdatum",fields.optString("date_of_birth"),short=true,birth=true){date->if(fields.optString("date_of_birth")!=(date?:"")){fields=JSONObject(fields.toString()).put("date_of_birth",date?:"");valid=false}}
+            DateFields("Ablaufdatum",fields.optString("date_of_expiry"),short=true){date->if(fields.optString("date_of_expiry")!=(date?:"")){fields=JSONObject(fields.toString()).put("date_of_expiry",date?:"");valid=false}}
             Field("optional_data","Optionale Angaben",limit=14)
             Text("MRZ · automatisch berechnet",fontSize=12.sp,color=Muted)
             if(valid)Text(mrz.chunked(44).joinToString("\n"),fontSize=8.sp,fontFamily=FontFamily.Monospace,color=Navy)
-            else Text("Bitte gültige Passangaben eingeben. Datum: JJMMTT; Staaten: ICAO-Code.",fontSize=12.sp,color=MaterialTheme.colorScheme.error)
+            else Text("Bitte die markierten Angaben vervollständigen.",fontSize=12.sp,color=MaterialTheme.colorScheme.error)
         }
     },confirmButton={TextButton({onSave(raw)},enabled=valid){Text("Übernehmen")}},dismissButton={TextButton(onDismiss){Text("Abbrechen")}})
 }

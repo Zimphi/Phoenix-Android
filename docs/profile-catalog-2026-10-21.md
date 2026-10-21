@@ -68,3 +68,24 @@ Real QR enrollment and revocation were exercised, but the full account-overview
 test with the new central account attributes remains pending service deployment
 and a fresh device QR. Online PKI issuance and the live Vercel catalogue database
 migration are not covered by these Android UI checks.
+
+## Portrait artwork
+
+The male and female anonymous silhouette PNGs are generated artwork, not photographs
+copied from the user's document references. The existing transparent Phoenix bird
+is reused as a low-opacity watermark. ePassport keeps the actual DG2 portrait when
+available; its fallback follows DG1 M/F. eID follows the effective DG11 M/F value or the local Settings → Schattenriss
+choice. Names are not used to infer gender; unspecified eID portraits use the
+male silhouette.
+The optional draft field `portrait_sex` survives saving, copying and JSON export,
+but `coreDraft()` excludes it from every native describe/mount/IFD request.
+
+## Mockup rendering and DG editing
+
+Document fields remain dynamic over generated mockup-derived paper artwork. The
+passport uses a 720:550 drawing surface with no red border. Native type wrappers
+(`GeneralPlace`, `Freetext`, etc.) are removed from display text only; structured
+place editing retains its source data. Plain-text birth places open as text.
+Signed originals offer “Kopie bearbeiten” from the selected data group. Cancel
+creates no profile; accepting creates a separate editable draft and opens that
+group, preserving the original catalogue/PersoSim fixture.

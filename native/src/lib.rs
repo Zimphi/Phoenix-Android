@@ -25,6 +25,8 @@ enum Request {
     Inventory,
     DescribeDraft {draft:Value},
     PassportCatalog,
+    EditorState {id:String},
+    RiUpdate {id:String,frozen:bool,#[serde(default)] regenerate:bool,#[serde(default)] keys:Option<Value>},
     IfdStart {draft:Value, pair:bool},
     IfdPair,
     IfdForget,
@@ -81,6 +83,8 @@ fn dispatch(request: &str) -> Result<Value> {
         Request::TrialPrepare => activation::prepare(ROOT.get().context("App root missing")?),
         Request::TrialReceive {delivery} => activation::receive(ROOT.get().context("App root missing")?,delivery),
         Request::Inventory => Ok(json!({"eid":native.inventory()?,"epassport":native.passport_inventory()?})),
+        Request::EditorState{id} => {*application=None;native.close();provision::editor_state(ROOT.get().context("App root missing")?,&id)},
+        Request::RiUpdate{id,frozen,regenerate,keys} => {*application=None;native.close();provision::ri_update(ROOT.get().context("App root missing")?,&id,frozen,regenerate,keys)},
         Request::MountDraft {draft} => provision::mount(native,ROOT.get().context("App root missing")?,draft,application),
         Request::Mount {kind,id} => { *application=None;native.close();match kind.as_str(){"eid"=>native.mount(&id),"epassport"=>native.mount_passport(&id),_=>anyhow::bail!("Core nicht verfügbar")}},
         Request::Apdu {command} => if let Some(card)=application.as_mut(){

@@ -7,6 +7,10 @@ test('editor shows actual eID values, a document, and saves only valid settings'
  await screen.getByText('eID',{exact:true}).tap();
  await screen.getByText('Max Mustermann',{exact:true}).tap();
  await expect(screen.getByText('Personalausweis Vorderseite',{exact:true})).toBeVisible();
+ await expect(screen.getByText('MUSTERMANN',{exact:true})).toBeVisible();
+ await expect(screen.getByText('BERLIN',{exact:true})).toBeVisible();
+ await app.screenshot('compact-identity-data-page');
+ await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('ID',{exact:true}));
  await expect(screen.getByText('ID',{exact:true})).toBeVisible();
  await expect(screen.getByText('Dokumenttyp',{exact:true})).toBeVisible();
  await expect(screen.getByText('Profil importieren',{exact:true})).not.toBeVisible();
@@ -15,6 +19,7 @@ test('editor shows actual eID values, a document, and saves only valid settings'
  await expect(screen.getByText('Änderungen speichern',{exact:true})).not.toBeVisible();
  await expect(screen.getByText('Profilname',{exact:true})).not.toBeVisible();
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Profil exportieren',{exact:true}));
+ await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Profil importieren',{exact:true}));
  await expect(screen.getByText('Profil importieren',{exact:true})).toBeVisible();
  await expect(screen.getByText('Profil exportieren',{exact:true})).toBeVisible();
  await app.screenshot('unified-eid-editor-settings');
@@ -26,8 +31,7 @@ test('new national passport is loaded with its real values and retired fixtures 
  await expect(screen.getByText('Depp',{exact:true})).not.toBeVisible();
  await screen.getByText('Mara Linden - Deutschland',{exact:true}).tap();
  await expect(screen.getByText('Reisepass Innenseite',{exact:true})).toBeVisible();
- await expect(screen.getByText(/Familienname: LINDEN/)).toBeVisible();
- await expect(screen.getByText(/Vorname.*MARA/)).toBeVisible();
+ await expect(screen.getByText('MARA LINDEN',{exact:true})).toBeVisible();
  await expect(screen.getByText('Synthetisches Gesichtsbild',{exact:true})).toBeVisible();
  await app.screenshot('icao-passport-data-page');
  await screen.getByTestId('editor-fields').scrollUntilVisible(screen.getByText('Gesichtsbild ansehen',{exact:true}));
@@ -46,7 +50,7 @@ test('passport DG1 fields generate MRZ without changing the draft when cancelled
  await device.openApp('de.phoenix.simulator',{relaunch:true});
  await screen.getByText('ePassport',{exact:true}).tap();
  await screen.getByText('Erika Mustermann',{exact:true}).tap();
- await screen.getByText(/Familienname: MUSTERMANN/).tap();
+ await screen.getByText('ERIKA MUSTERMANN',{exact:true}).tap();
  await expect(screen.getByText('DG1 · Personendaten',{exact:true})).toBeVisible();
  await screen.getByRole('textbox').nth(0).fill('Mueller');
  await app.back();
@@ -58,5 +62,5 @@ test('passport DG1 fields generate MRZ without changing the draft when cancelled
  await expect(screen.getByRole('group').filter({hasText:'Übernehmen',has:screen.getByRole('button')}).last().getByRole('button')).toBeEnabled();
  await app.screenshot('structured-passport-dg1-and-mrz');
  await screen.getByRole('group').filter({hasText:'Abbrechen',has:screen.getByRole('button')}).last().getByRole('button').tap();
- await expect(screen.getByText(/Familienname: MUSTERMANN/)).toBeVisible();
+ await expect(screen.getByText('ERIKA MUSTERMANN',{exact:true})).toBeVisible();
 });

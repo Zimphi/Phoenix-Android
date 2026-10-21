@@ -40,6 +40,7 @@ class MainActivity:ComponentActivity() {
     val account=remember{PkiDevice(context.applicationContext)}
     var identity by remember{mutableStateOf(account.identity())}
     val userId=identity.optString("user_id").takeIf{it.isNotBlank()}
+    var cloudVerified by remember{mutableStateOf(false)}
     var accountBusy by remember{mutableStateOf(false)}
     val storeResult=remember{runCatching{ProfileStore(context)}}
     val store=storeResult.getOrNull()
@@ -51,6 +52,7 @@ class MainActivity:ComponentActivity() {
     var legal by remember{mutableStateOf<String?>(null)}
     var editing by remember{mutableStateOf<String?>(null)}
     var editingValue by remember{mutableStateOf("")}
+    var copyGroup by remember{mutableStateOf<Pair<String,String>?>(null)}
     var status by remember{mutableStateOf("Simulation nicht aktiv")}
     var wlan by remember{mutableStateOf(false)}
     var remoteState by remember{mutableStateOf(JSONObject())}
@@ -59,7 +61,22 @@ class MainActivity:ComponentActivity() {
     var simulationPicker by remember{mutableStateOf(false)}
     var startup by remember{mutableStateOf(true)}
     val coreReady=remember{CompletableDeferred<Unit>()}
-    LaunchedEffect(page,selected?.id){if(page!="Simulation"){CardService.deactivate();if(page!="IFD-Schnittstelle")withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"))}};remoteState=JSONObject();if(status=="Bereit für Lesegerät")status="Simulation beendet"}}
+    LaunchedEffect(page,selected?.id){if(page!="Simulation"){
+        CardService.deactivate()
+        if(page!="IFD-Schnittstelle")withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_stop"));NativeCore.call(JSONObject().put("op","close"))}}
+        remoteState=JSONObject();if(status=="Bereit für Lesegerät")status="Simulation beendet"
+        val profile=selected
+        if(page=="Editor"&&profile?.kind=="eid") {
+            val state=withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","editor_state").put("id",profile.id))}.getOrNull()}
+            state?.optJSONObject("settings")?.takeIf{
+                val applied=state.optJSONObject("draft_settings")
+                applied!=null&&applied.keys().asSequence().all{key->profile.settings.opt(key)==applied.opt(key)}
+            }?.let{settings->
+                val old=profile.settings;profile.settings=settings;profile.ri=state.optJSONObject("ri")
+                runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++}.onFailure{profile.settings=old;message=it.message}
+            }
+        }
+    }}
     LaunchedEffect(Unit) {
         val began=android.os.SystemClock.uptimeMillis()
         val initialization=withContext(Dispatchers.IO){
@@ -89,10 +106,12 @@ class MainActivity:ComponentActivity() {
         }
     }
     var exportId by rememberSaveable{mutableStateOf<String?>(null)}
+    var pendingExport by remember{mutableStateOf<ByteArray?>(null)}
     val exporter=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
         val id=exportId;exportId=null
+        val prepared=pendingExport;pendingExport=null
         if(uri!=null&&id!=null&&store!=null)scope.launch {
-            val result=runCatching{ProfileStore.exportDraft(store.profiles.single{it.id==id})}
+            val result=runCatching{prepared?:error("Export bitte erneut starten") }
             result.onSuccess{bytes->
                 withContext(Dispatchers.IO){runCatching{
                     val stream=context.contentResolver.openOutputStream(uri,"wt")?:error("Datei nicht beschreibbar")
@@ -102,6 +121,24 @@ class MainActivity:ComponentActivity() {
         }
     }
     if(store==null){Box(Modifier.fillMaxSize().background(Page).padding(24.dp)){Text("Profilspeicher nicht lesbar. Vorhandene Daten bleiben erhalten.",color=Navy)};return}
+    fun exportProfile(profile:Profile) {
+        val snapshot=Profile.parse(profile.json()).apply{baselineGroups=profile.baselineGroups}
+        scope.launch {
+            withContext(Dispatchers.IO){runCatching{
+                if(snapshot.kind=="eid") {
+                    CardService.deactivate()
+                    NativeCore.call(JSONObject().put("op","ifd_stop"))
+                    NativeCore.call(JSONObject().put("op","mount_draft").put("draft",snapshot.coreDraft()))
+                    NativeCore.call(JSONObject().put("op","close"))
+                    val state=NativeCore.call(JSONObject().put("op","editor_state").put("id",snapshot.id))
+                    snapshot.ri=state.getJSONObject("ri");snapshot.settings=state.getJSONObject("settings")
+                }
+                ProfileStore.exportDraft(snapshot)
+            }}.onSuccess{bytes->
+                pendingExport=bytes;exportId=snapshot.id;exporter.launch(snapshot.id+".json")
+            }.onFailure{message=it.message}
+        }
+    }
     fun createProfile(kind:String) {
         if(store.ownCount()>=100){message="Maximal 100 eigene Profile";return}
         val draft=Profile.defaults().getJSONObject(if(kind=="eid")1 else 0)
@@ -123,7 +160,7 @@ class MainActivity:ComponentActivity() {
             !wlan&&!context.packageManager.hasSystemFeature("android.hardware.nfc.hce")->message="Keine NFC-Kartenemulation verfügbar"
             else->{
                 val session=CardService.beginStart()
-                val draft=profile.json()
+                val draft=profile.coreDraft()
                 status="Simulation wird gestartet …"
                 scope.launch {
                     val result=withContext(Dispatchers.IO){runCatching{
@@ -152,7 +189,7 @@ class MainActivity:ComponentActivity() {
             val result=withContext(Dispatchers.IO){runCatching{
                 coreReady.await();TrialActivation.activate()
                 NativeCore.call(JSONObject().put("op","ifd_stop"))
-                NativeCore.call(JSONObject().put("op","mount_draft").put("draft",profile.json()))
+                NativeCore.call(JSONObject().put("op","mount_draft").put("draft",profile.coreDraft()))
             }}
             if(selected?.id==profile.id&&status=="Profil wird geladen …")result.onSuccess{status="Profil geladen"}.onFailure{status="Profil konnte nicht geladen werden";message=it.message}
         }
@@ -176,11 +213,11 @@ class MainActivity:ComponentActivity() {
         val old=profile.name;val previous=profile.settings;profile.name=value;profile.settings=settings
         return runCatching{Profile.parse(profile.json());store?.save()}.onSuccess{revision++}.onFailure{profile.name=old;profile.settings=previous;message=it.message}.isSuccess
     }
-    LaunchedEffect(page){identity=account.identity();if(account.connected())withContext(Dispatchers.IO){runCatching{account.status()}}.onSuccess{identity=account.identity()}}
+    LaunchedEffect(page){cloudVerified=false;identity=account.identity();if(account.connected())withContext(Dispatchers.IO){runCatching{account.status()}}.onSuccess{identity=account.identity();cloudVerified=account.verifiedConnection()}}
     val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
     if(startup){Startup();return}
     Column(Modifier.fillMaxSize().background(Page).statusBarsPadding().semantics{testTagsAsResourceId=true}) {
-        Row(Modifier.fillMaxWidth().height(if(page=="Profile")96.dp else 56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
+        if(page!="Editor")Row(Modifier.fillMaxWidth().height(if(page=="Profile")96.dp else 56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
             if(page=="Profile"||page=="Simulation") {
                 Brand(Modifier.size(if(page=="Profile")72.dp else 34.dp,if(page=="Profile")86.dp else 42.dp));Spacer(Modifier.width(12.dp));Text("Phoenix",fontSize=if(page=="Profile")30.sp else 20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
             }else{
@@ -191,17 +228,37 @@ class MainActivity:ComponentActivity() {
             if(userId!=null&&page!="Benutzer")IconButton({page="Benutzer"},Modifier.semantics{contentDescription="Benutzerkonto öffnen"}.testTag("open-account")){AccountAvatar(Modifier.size(30.dp))}
             if(page !in listOf("Einstellungen","Editor","Profilliste","IFD-Schnittstelle","Cloud-Anbindung","Benutzer"))IconButton({page="Einstellungen"},Modifier.semantics{contentDescription="Einstellungen"}){Glyph("gear",Navy)}
         }
-        Box(Modifier.weight(1f).padding(horizontal=Inset).padding(top=8.dp,bottom=16.dp)) {
+        Box(Modifier.weight(1f).padding(horizontal=if(page=="Editor")10.dp else Inset).padding(top=if(page=="Editor")0.dp else 8.dp,bottom=16.dp)) {
             val visibleProfiles=remember(revision){store.profiles.toList()}
             key(Unit) {
                 when(page) {
                     "Profile"->ProfileList(visibleProfiles,{selectedKind=it;selected=null;page="Profilliste"})
                     "Profilliste"->ProfileSelection(visibleProfiles,selectedKind,{selected=it;page="Editor"},{createProfile(selectedKind)})
-                    "Editor"->selected?.let{profile->Editor(profile,{importer.launch(arrayOf("application/json"))},{
-                        runCatching{ProfileStore.exportDraft(profile)}.onSuccess{exportId=profile.id;exporter.launch(profile.id+".json")}.onFailure{message=it.message}
+                    "Editor"->selected?.let{profile->Editor(profile,revision,cloudVerified,{importer.launch(arrayOf("application/json"))},{
+                        exportProfile(profile)
                     },{name,settings->saveProfile(profile,name,settings)},{
                         runCatching{store.importDraft(profile.editableCopy().toString())}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
-                    },{group,value->if(profile.signedFixture||profile.passportCatalog)message="Originales signiertes Testprofil: Datengruppen bleiben unverändert. Eigene Daten bitte in einem separaten Profil bearbeiten." else {editingValue=value;editing=group}},{selectSimulation(profile)})}
+                    },{group,value->if(profile.signedFixture||profile.passportCatalog)copyGroup=group to value else {editingValue=value;editing=group}},{selectSimulation(profile)},{value->
+                        val old=profile.portraitSex;profile.portraitSex=value
+                        runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++}.onFailure{profile.portraitSex=old;message=it.message}.isSuccess
+                    },{page="Profilliste"},{number->
+                        val old=profile.documentNumber;profile.documentNumber=number
+                        runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++}.onFailure{profile.documentNumber=old;message=it.message}.isSuccess
+                    },{
+                        CardService.deactivate()
+                        runCatching{store.resetPersonalization(profile)}.onSuccess{selected=it;revision++}.onFailure{message=it.message}
+                    },{infrastructure->
+                        val old=profile.pkiInfrastructure
+                        if(infrastructure=="phoenix"&&!account.verifiedConnection())message="Zuerst erfolgreich mit der Cloud verbinden" else {
+                            profile.pkiInfrastructure=infrastructure
+                            runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++}.onFailure{profile.pkiInfrastructure=old;message=it.message}
+                        }
+                    },{state->
+                        state.optJSONObject("settings")?.let{settings->
+                            val old=profile.settings;profile.settings=settings;profile.ri=state.optJSONObject("ri")
+                            runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++}.onFailure{profile.settings=old;message=it.message}
+                        }
+                    })}
                     "Benutzer"->UserAccount(identity,account.environment(),accountBusy){
                         accountBusy=true
                         scope.launch{withContext(Dispatchers.IO){runCatching{account.disconnect()}}.onSuccess{identity=JSONObject();page="Einstellungen"}.onFailure{message=it.message};accountBusy=false}
@@ -231,6 +288,14 @@ class MainActivity:ComponentActivity() {
         forgetPairing=false;scope.launch{withContext(Dispatchers.IO){runCatching{NativeCore.call(JSONObject().put("op","ifd_forget"))}.onFailure{message=it.message}};remoteState=JSONObject()}
     }){Text("Entfernen")}},dismissButton={TextButton({forgetPairing=false}){Text("Abbrechen")}})
     if(message!=null)AlertDialog(onDismissRequest={message=null},title={Text("Phoenix")},text={Text(message!!)},confirmButton={TextButton({message=null}){Text("OK")}})
+    copyGroup?.let{(group,value)->
+        AlertDialog(onDismissRequest={copyGroup=null},title={Text("Originalprofil bearbeiten")},text={Text("Dieses signierte Original bleibt erhalten. Zum Ändern der Datengruppen wird eine eigene bearbeitbare Kopie angelegt.")},confirmButton={TextButton({
+            val original=selected
+            if(original!=null)runCatching{store.importDraft(original.editableCopy().toString())}.onSuccess{
+                selected=it;revision++;copyGroup=null;editingValue=value;editing=group
+            }.onFailure{message=it.message}
+        }){Text("Kopie bearbeiten")}},dismissButton={TextButton({copyGroup=null}){Text("Abbrechen")}})
+    }
     editing?.let{group->
         val profile=selected!!
         fun saveGroup(value:String) {
@@ -239,8 +304,10 @@ class MainActivity:ComponentActivity() {
             runCatching{Profile.parse(profile.json());store.save()}.onSuccess{revision++;editing=null}.onFailure{profile.groups=old;message=it.message}
         }
         if(profile.kind=="epassport"&&group=="DG1")PassportDataEditor(editingValue,{editing=null},::saveGroup)
+        else if(profile.kind=="epassport"&&group=="DG2")PassportPortraitPicker(profile,{editing=null},::saveGroup)
+        else if(profile.kind=="eid")EidGroupEditor(group,editingValue,{editing=null},::saveGroup)
         else {
-            var value by remember(group){mutableStateOf(editingValue)}
+            var value by remember(profile.id,group){mutableStateOf(if(profile.kind=="eid")editableGroupText(editingValue) else editingValue)}
             AlertDialog(onDismissRequest={editing=null},title={Text("$group bearbeiten")},text={OutlinedTextField(value,{value=it.take(65536)},modifier=Modifier.fillMaxWidth().heightIn(min=120.dp,max=260.dp),label={Text("$group Inhalt")})},confirmButton={TextButton({saveGroup(value)}){Text("Speichern")}},dismissButton={TextButton({editing=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("cancel-group")){Text("Abbrechen")}})
         }
     }

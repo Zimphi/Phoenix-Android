@@ -23,7 +23,7 @@ final class NativeCore {
     static synchronized JSONObject call(JSONObject request) throws Exception {
         if(!available) throw new IllegalStateException("Native Core-Bibliothek fehlt. Simulation ist nicht verfügbar.");
         JSONObject response=new JSONObject(exchange(request.toString()));
-        if(response.has("error")) throw new IllegalStateException(response.getString("error"));
+        if(response.has("error")) throw new IllegalStateException(request.optString("op")+": "+response.getString("error"));
         return response;
     }
 }

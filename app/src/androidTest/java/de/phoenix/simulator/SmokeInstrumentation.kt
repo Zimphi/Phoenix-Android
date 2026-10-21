@@ -41,6 +41,39 @@ class SmokeInstrumentation:Instrumentation() {
                 check(description.getString("mrz").length==88)
                 check(decodePortrait(description.getString("portrait"))!=null)
             }
+            store.profiles.filter{it.signedFixture}.forEach{original->
+                val before=original.json().toString()
+                val edited=store.importDraft(original.editableCopy().toString())
+                check(edited.persosimSource==original.id)
+                edited.groups.put("DG4","GEAENDERT")
+                store.save()
+                val reloaded=ProfileStore(isolated).profiles.single{it.id==edited.id}
+                val description=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",reloaded.coreDraft()))
+                check(description.getJSONObject("groups").getString("DG4")=="GEAENDERT")
+                check(original.json().toString()==before&&!reloaded.signedFixture)
+                store.profiles.remove(edited);store.save()
+            }
+            for(kind in listOf("eid","epassport")) {
+                val source=store.profiles.first{it.kind==kind}
+                val own=store.importDraft(source.editableCopy().toString())
+                val original=own.json().toString()
+                own.groups.put(if(kind=="eid")"DG4" else "DG1","changed")
+                own.settings.put("can","654321");own.portraitSex="M";own.documentNumber="TEST2";own.pkiInfrastructure="phoenix"
+                store.save()
+                val reopened=ProfileStore(isolated)
+                val restored=reopened.resetPersonalization(reopened.profiles.single{it.id==own.id})
+                val data=restored.json();val generation=data.getString("personalization_generation")
+                data.remove("personalization_generation")
+                check(data.toString()==original)
+                check(generation.isNotEmpty()&&restored.coreDraft().getString("personalization_generation")==generation)
+                check(ProfileStore(isolated).profiles.single{it.id==own.id}.personalizationGeneration==generation)
+                store.profiles.remove(own);store.save()
+            }
+            val invalidPki=Profile.defaults().getJSONObject(0).put("pki_infrastructure","bsi")
+            check(runCatching{Profile.parse(invalidPki)}.isFailure)
+            invalidPki.put("pki_infrastructure","own")
+            check(runCatching{Profile.parse(invalidPki)}.isFailure)
+            check(!PkiDevice(targetContext).verifiedConnection())
             val catalogue=store.profiles.first{it.passportCatalog}
             val catalogueBefore=catalogue.json().toString()
             val copy=Profile.parse(catalogue.editableCopy())
@@ -58,7 +91,81 @@ class SmokeInstrumentation:Instrumentation() {
             check(runCatching{decodePortrait("not-an-image")}.isFailure)
             check(runCatching{decodePortrait("A".repeat(2*1024*1024+1))}.isFailure)
 
+            val td3="P<UTO"+"ERIKSSON<<ANNA<MARIA".padEnd(39,'<')+"D231458907UTO7408122F1204159".padEnd(44,'<')
+            val td1=td1FromTd3(td3,"I<")
+            check(td1=="I<UTOD231458907<<<<<<<<<<<<<<<\n7408122F1204159UTO<<<<<<<<<<<6\nERIKSSON<<ANNA<MARIA<<<<<<<<<<")
+            check(td1.lines().all{it.length==30})
+            check(runCatching{td1FromTd3("invalid","ID")}.isFailure)
+            val numbered=Profile.parse(Profile.defaults().getJSONObject(1))
+            check(numbered.documentNumber.matches(Regex("[A-Z0-9]{9}")))
+            numbered.documentNumber="T00000001"
+            check(Profile.parse(numbered.json()).documentNumber=="T00000001")
+            check(!numbered.coreDraft().has("document_number"))
+            check(eidBackStart("UB")=="DG9"&&eidBackStart("AR")=="DG17")
+            check(dateValue("29","2","2024",false)=="20240229")
+            check(dateValue("29","2","2023",false)==null)
+            check(dateValue("31","4","2026",false)==null)
+            check(dateValue("12","8","1983",true)=="830812")
+            check(compactDate("830812",true)?.year==1983)
+            check(compactDate("20310801",false)?.dayOfMonth==1)
+            check(residenceDocument("AR")&&!residenceDocument("ID"))
+            val typeDraft=Profile.parse(Profile.defaults().getJSONObject(1))
+            typeDraft.groups.put("DG19","retained residence data")
+            check(!typeDraft.coreDraft().getJSONObject("groups").has("DG19"))
+            check(typeDraft.json().getJSONObject("groups").getString("DG19")=="retained residence data")
+            typeDraft.groups.put("DG1","AR")
+            check(typeDraft.coreDraft().getJSONObject("groups").has("DG19"))
+            val addressRoot=JSONObject("""{"Places":[{"Structured":{"city":"BERLIN","country":"D"}},{"Freetext":"Zweite Anschrift"}]}""")
+            structuredPlaces(addressRoot).single().put("city","KÖLN")
+            check(addressRoot.getJSONArray("Places").getJSONObject(1).getString("Freetext")=="Zweite Anschrift")
+            val freePlace="""{"GeneralPlace":{"Freetext":"BERLIN"}}"""
+            check(groupValue("eid","DG9",freePlace)=="BERLIN")
+            check(editableGroupText(freePlace)=="BERLIN")
+            check(editableGroupText("""{"Text":"ERIKA"}""")=="ERIKA")
+            val structuredPlace="""{"GeneralPlace":{"Structured":{"city":"BERLIN","country":"D"}}}"""
+            check(editableGroupText(structuredPlace)==structuredPlace)
+            check(!groupValue("eid","DG9",structuredPlace).contains("GeneralPlace"))
+            check(readableValue(JSONObject("""{"Bytes":[1,2,3]}"""))=="Binärdaten · 3 Bytes")
             val settings=JSONObject(store.profiles.first{it.kind=="eid"}.json().toString())
+            val appearance=Profile.parse(settings)
+            check(portraitSex(appearance,JSONObject().put("DG11","F"))=="F")
+            check(portraitSex(appearance,JSONObject())=="M")
+            appearance.groups=JSONObject(appearance.groups.toString()).put("DG11","M")
+            check(portraitSex(appearance,appearance.groups)=="M")
+            appearance.portraitSex="F"
+            check(portraitSex(appearance,appearance.groups)=="F")
+            check(Profile.parse(appearance.json()).portraitSex=="F")
+            check(!appearance.coreDraft().has("portrait_sex"))
+            check(runCatching{Profile.parse(appearance.json().put("portrait_sex","invalid"))}.isFailure)
+            val female=Profile.parse(Profile.defaults().getJSONObject(0))
+            check(portraitSex(female,female.groups)=="F")
+            val maleGroups=JSONObject().put("DG1",JSONObject(female.groups.getString("DG1")).put("sex","M").toString())
+            check(portraitSex(female,maleGroups)=="M")
+            check(portraitSex(female,JSONObject().put("DG1","{}"))=="")
+            for(preset in listOf("picture-1","picture-2","picture-3","shadow-male","shadow-female")) {
+                val draft=Profile.defaults().getJSONObject(0)
+                draft.getJSONObject("groups").put("DG2","synthetic:$preset")
+                check(decodePortrait(NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft)).getString("portrait"))!=null)
+            }
+            val eid=store.profiles.first{it.kind=="eid"};eid.portraitSex="F";store.save()
+            check(ProfileStore(isolated).profiles.single{it.id==eid.id}.portraitSex=="F")
+            check(Profile.parse(JSONObject(ProfileStore.exportDraft(eid).toString(Charsets.UTF_8))).portraitSex=="F")
+            check(NativeCore.call(JSONObject().put("op","describe_draft").put("draft",eid.coreDraft())).has("groups"))
+            for(type in listOf("ID","AR","AS","AF","UB")) {
+                val draft=eid.coreDraft()
+                draft.getJSONObject("groups").put("DG1",type).put("DG4","GEAENDERT").put("DG11","M").put("DG15","20210101")
+                val result=NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))
+                check(result.getJSONObject("groups").getString("DG4")=="GEAENDERT")
+                check(result.getJSONObject("groups").getString("DG15")=="20210101")
+                check(result.getJSONObject("groups").has("DG17"))
+                val active=result.getJSONArray("active")
+                check((0 until active.length()).none{active.getInt(it) in listOf(11,15,21,22)})
+                if(type in listOf("AR","AS","AF"))check((0 until active.length()).none{active.getInt(it)==6})
+            }
+            for(resource in listOf(R.drawable.portrait_male,R.drawable.portrait_female)) {
+                val bitmap=android.graphics.BitmapFactory.decodeResource(targetContext.resources,resource)
+                check(bitmap.hasAlpha()&&bitmap.width>0&&bitmap.height>bitmap.width);bitmap.recycle()
+            }
             settings.getJSONObject("settings").put("pin_retries",2).put("puk_uses",7).put("transport_pin",true).put("pin","12345").put("eid_active",false)
             check(Profile.parse(settings).settings.getInt("pin_retries")==2)
             check(Profile.parse(settings).settings.getBoolean("transport_pin"))
@@ -116,6 +223,7 @@ class SmokeInstrumentation:Instrumentation() {
             check(countries.single{it.alpha3=="DEU"}.mrz=="D<<")
             check(countries.single{it.icao=="RKS"}.matches("Kosovo"))
             check(countries.single{it.alpha3=="FRA"}.hasCode("FRA"))
+            check(countries.none{it.hasCode("")})
             check(passportDate("860315")=="15.03.86")
             check(passportDate("19900101")=="01.01.1990")
             val owner=java.util.UUID.randomUUID().toString()
@@ -149,17 +257,55 @@ class SmokeInstrumentation:Instrumentation() {
                 TrialActivation.activate()
                 val defaults=Profile.defaults()
                 for(index in 0 until defaults.length()) {
-                    val draft=defaults.getJSONObject(index)
+                    val draft=Profile.parse(defaults.getJSONObject(index)).coreDraft()
                     NativeCore.call(JSONObject().put("op","mount_draft").put("draft",draft))
                     val command=if(draft.getString("kind")=="epassport")"00a4040c07a0000002471001" else "00a4040c09e80704007f00070302"
                     val response=NativeCore.call(JSONObject().put("op","apdu").put("command",command)).getString("response")
                     check(response.endsWith("9000")){"Document selection failed"}
                     NativeCore.call(JSONObject().put("op","close"))
                 }
+                val riProfile=Profile.parse(Profile.defaults().getJSONObject(1).put("id","ri-test-"+java.util.UUID.randomUUID()))
+                fun riState():JSONObject {
+                    NativeCore.call(JSONObject().put("op","mount_draft").put("draft",riProfile.coreDraft()))
+                    NativeCore.call(JSONObject().put("op","close"))
+                    return NativeCore.call(JSONObject().put("op","editor_state").put("id",riProfile.id))
+                }
+                val initialRi=riState().getJSONObject("ri")
+                riProfile.groups.put("DG18","123456789012")
+                check(riState().getJSONObject("ri").getString("ec_public")==initialRi.getString("ec_public"))
+                riProfile.groups.put("DG5","ANDERS")
+                val changedRi=riState().getJSONObject("ri")
+                check(changedRi.getString("ec_public")!=initialRi.getString("ec_public"))
+                check(changedRi.getString("dh_public")!=initialRi.getString("dh_public"))
+                riProfile.groups=Profile.defaults().getJSONObject(1).getJSONObject("groups")
+                check(riState().getJSONObject("ri").getString("ec_public")==initialRi.getString("ec_public"))
+                val frozen=NativeCore.call(JSONObject().put("op","ri_update").put("id",riProfile.id).put("frozen",true))
+                check(frozen.getJSONObject("ri").getBoolean("frozen"))
+                riProfile.groups.put("DG5","ANDERS")
+                check(riState().getJSONObject("ri").getString("ec_public")==initialRi.getString("ec_public"))
+                val regenerated=NativeCore.call(JSONObject().put("op","ri_update").put("id",riProfile.id).put("frozen",true).put("regenerate",true)).getJSONObject("ri")
+                check(regenerated.getString("ec_public")!=initialRi.getString("ec_public"))
+                check(riState().getJSONObject("ri").toString()==regenerated.toString())
+                val exported=Profile.parse(riProfile.json().put("id","ri-import-"+java.util.UUID.randomUUID()).put("ri",regenerated))
+                NativeCore.call(JSONObject().put("op","mount_draft").put("draft",exported.coreDraft()))
+                NativeCore.call(JSONObject().put("op","close"))
+                val importedRi=NativeCore.call(JSONObject().put("op","editor_state").put("id",exported.id)).getJSONObject("ri")
+                check(importedRi.toString()==regenerated.toString())
+                result.putBoolean("ri_policy_persistence_and_import",true)
+                val fixtures=targetContext.assets.open("persosim-profiles.json").use{org.json.JSONArray(ProfileStore.read(it))}
+                val original=Profile.parse(fixtures.getJSONObject(0));original.signedFixture=true
+                val bsi=Profile.parse(original.editableCopy());bsi.pkiInfrastructure="bsi"
+                NativeCore.call(JSONObject().put("op","mount_draft").put("draft",bsi.coreDraft()))
+                check(NativeCore.call(JSONObject().put("op","apdu").put("command","00a4040c09e80704007f00070302")).getString("response").endsWith("9000"))
+                bsi.groups.put("DG4","GEAENDERT")
+                check(runCatching{NativeCore.call(JSONObject().put("op","mount_draft").put("draft",bsi.coreDraft()))}.isFailure)
+                bsi.pkiInfrastructure="phoenix"
+                check(runCatching{NativeCore.call(JSONObject().put("op","mount_draft").put("draft",bsi.coreDraft()))}.isFailure)
+                NativeCore.call(JSONObject().put("op","close"))
                 result.putBoolean("activation_and_document_selection",true)
             }
             result.putString("stream",if(activation)"Background trial activation, ePassport/eID personalization and SELECT APDUs passed; stale and paused starts remain disarmed." else "Draft persistence, import validation, hardware key proof, native initialization, both-core inventory and start cancellation passed.")
             finish(Activity.RESULT_OK,result)
-        }catch(error:Throwable){result.putString("stream","FAILED at ${error.stackTrace.firstOrNull()}: ${error.javaClass.simpleName}: ${error.message}");finish(Activity.RESULT_CANCELED,result)}
+        }catch(error:Throwable){result.putString("stream","FAILED at ${error.stackTrace.firstOrNull{it.className.endsWith("SmokeInstrumentation")}}: ${error.javaClass.simpleName}: ${error.message}");finish(Activity.RESULT_CANCELED,result)}
     }
 }

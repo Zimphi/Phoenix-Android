@@ -11,6 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -56,7 +59,7 @@ import org.json.JSONObject
             Text("$label-Profile",fontSize=30.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.9).sp,color=Navy)
             Text("${matching.size} ${if(matching.size==1)"Profil" else "Profile"} · Lokal auf diesem Gerät",fontSize=13.sp,color=Muted)
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top=8.dp)) {
+        Column(Modifier.weight(1f).testTag("profile-list").verticalScroll(rememberScrollState()).padding(top=8.dp)) {
             if(matching.isEmpty())Text("Noch kein $label-Profil vorhanden.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=24.dp))
             matching.forEach { profile ->
                 Row(Modifier.fillMaxWidth().clickable{onSelect(profile)}.padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
@@ -139,27 +142,43 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Editor(profile:Profile,onImport:()->Unit,onExport:()->Unit,onSave:(String,JSONObject)->Boolean,onCopy:()->Unit,onEditGroup:(String,String)->Unit,onSimulate:()->Unit) {
-    var groups by remember(profile.id){mutableStateOf(true)}
-    var face by remember(profile.id){mutableStateOf(false)}
-    var can by remember(profile.id){mutableStateOf(profile.settings.getString("can"))}
-    var pin by remember(profile.id){mutableStateOf(profile.settings.getString("pin"))}
-    var puk by remember(profile.id){mutableStateOf(profile.settings.getString("puk"))}
-    var retries by remember(profile.id){mutableStateOf(profile.settings.optInt("pin_retries",3).toString())}
-    var uses by remember(profile.id){mutableStateOf(profile.settings.optInt("puk_uses",10).toString())}
-    var transport by remember(profile.id){mutableStateOf(profile.settings.optBoolean("transport_pin",false))}
-    var eidActive by remember(profile.id){mutableStateOf(profile.settings.optBoolean("eid_active",true))}
+@Composable internal fun Editor(profile:Profile,revision:Int,cloudVerified:Boolean,onImport:()->Unit,onExport:()->Unit,onSave:(String,JSONObject)->Boolean,onCopy:()->Unit,onEditGroup:(String,String)->Unit,onSimulate:()->Unit,onPortrait:(String)->Boolean,onBack:()->Unit,onDocumentNumber:(String)->Boolean,onReset:()->Unit,onPki:(String)->Unit,onCoreState:(JSONObject)->Unit) {
+    var reset by remember(profile){mutableStateOf(false)}
+    var groups by remember(profile){mutableStateOf(true)}
+    var back by remember(profile){mutableStateOf(false)}
+    val fieldScroll=key(profile){rememberScrollState()}
+    var backOffset by remember(profile){mutableFloatStateOf(Float.POSITIVE_INFINITY)}
+    var fieldHeight by remember{mutableIntStateOf(0)}
+    LaunchedEffect(fieldScroll.value,groups,backOffset,fieldHeight){if(groups&&profile.kind=="eid")back=fieldScroll.value+fieldHeight*.5f>=backOffset}
+
+    var face by remember(profile){mutableStateOf(false)}
+    var portrait by remember(profile){mutableStateOf(profile.portraitSex)}
+    var documentNumber by remember(profile){mutableStateOf(profile.documentNumber)}
+    var can by remember(profile){mutableStateOf(profile.settings.getString("can"))}
+    var pin by remember(profile){mutableStateOf(profile.settings.getString("pin"))}
+    var puk by remember(profile){mutableStateOf(profile.settings.getString("puk"))}
+    var retries by remember(profile){mutableStateOf(profile.settings.optInt("pin_retries",3).toString())}
+    var uses by remember(profile){mutableStateOf(profile.settings.optInt("puk_uses",10).toString())}
+    var transport by remember(profile){mutableStateOf(profile.settings.optBoolean("transport_pin",false))}
+    var eidActive by remember(profile){mutableStateOf(profile.settings.optBoolean("eid_active",true))}
+    LaunchedEffect(profile.settings.toString()) {
+        can=profile.settings.getString("can");pin=profile.settings.getString("pin");puk=profile.settings.getString("puk")
+        retries=profile.settings.optInt("pin_retries",3).toString();uses=profile.settings.optInt("puk_uses",10).toString()
+        transport=profile.settings.optBoolean("transport_pin",false);eidActive=profile.settings.optBoolean("eid_active",true)
+    }
     val valid=profile.passportCatalog||(can.matches(Regex("[0-9]{6}"))&&pin.matches(Regex(if(transport)"[0-9]{5}" else "[0-9]{6}"))&&puk.matches(Regex("[0-9]{10}"))&&retries.toIntOrNull() in 0..3&&uses.toIntOrNull() in 0..10)
     val save={onSave(profile.name,JSONObject().put("can",can).put("pin",pin).put("puk",puk).put("pin_retries",retries.toInt()).put("puk_uses",uses.toInt()).put("transport_pin",transport).put("eid_active",eidActive))}
-    var displayedGroups by remember(profile.id){mutableStateOf(profile.groups)}
-    var displayedMrz by remember(profile.id){mutableStateOf("")}
-    LaunchedEffect(profile.id,profile.groups.toString()) {
-        val draft=profile.json()
+    var displayedGroups by remember(profile){mutableStateOf(profile.groups)}
+    var displayedMrz by remember(profile){mutableStateOf("")}
+    var displayedPortrait by remember(profile){mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)}
+    LaunchedEffect(profile.id,revision,profile.groups.toString()) {
+        val draft=profile.coreDraft()
         val description=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){runCatching{
             NativeCore.call(JSONObject().put("op","describe_draft").put("draft",draft))
         }.getOrNull()}
         displayedGroups=description?.optJSONObject("groups")?:profile.groups
         displayedMrz=description?.optString("mrz")?:""
+        displayedPortrait=description?.optString("portrait")?.takeIf{it.isNotBlank()&&it!="null"}?.let{runCatching{decodePortrait(it)}.getOrNull()}
     }
     LaunchedEffect(can,pin,puk,retries,uses,transport,eidActive) {
         if(valid&&!profile.passportCatalog) {
@@ -167,41 +186,72 @@ import org.json.JSONObject
             if(settings.toString()!=profile.settings.toString())onSave(profile.name,settings)
         }
     }
-    if(face)AlertDialog(onDismissRequest={face=false},title={Text("DG2 · Gesichtsbild")},text={PassportFace(profile)},confirmButton={TextButton({face=false}){Text("Schließen")}})
-    Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(13.dp)) {
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-            Text(profile.name,fontSize=22.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text(if(profile.passportCatalog)"ePassport · Originales Simulatorprofil" else if(profile.signedFixture)"eID · Signiertes PersoSim-Profil" else "${profile.label()} · Testprofil",fontSize=13.sp,color=Muted)
+    if(reset)AlertDialog(onDismissRequest={reset=false},title={Text("Personalisierungsdaten zurücksetzen?")},text={Text("Datengruppen, Zugangsdaten und Dokumentdarstellung werden auf den gesicherten Ausgangsstand dieses Profils zurückgesetzt. Änderungen gehen verloren.")},confirmButton={TextButton({reset=false;onReset()}){Text("Zurücksetzen")}},dismissButton={TextButton({reset=false}){Text("Abbrechen")}})
+    if(face)AlertDialog(onDismissRequest={face=false},title={Text("DG2 · Gesichtsbild")},text={PassportFace(profile)},confirmButton={TextButton({face=false}){Text("Schließen")}},dismissButton={TextButton({face=false;onEditGroup("DG2",profile.groups.optString("DG2"))}){Text("Bild auswählen")}})
+    Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().height(48.dp),verticalAlignment=Alignment.CenterVertically) {
+            IconButton(onBack,Modifier.semantics{contentDescription="Zurück"}){Glyph("back",Navy)}
+            Text(profile.name,fontSize=16.sp,fontWeight=FontWeight.ExtraBold,color=Navy,maxLines=1,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center,modifier=Modifier.weight(1f))
+            IconButton({if(profile.passportCatalog||save())onSimulate()},enabled=valid,modifier=Modifier.semantics{contentDescription="Profil in Simulation übernehmen"}){Box(Modifier.size(28.dp).background(Color(0xffe7eef6),androidx.compose.foundation.shape.CircleShape),contentAlignment=Alignment.Center){Glyph("play",Navy,Modifier.size(15.dp))}}
         }
-        IconButton({if(profile.passportCatalog||save())onSimulate()},enabled=valid,modifier=Modifier.semantics{contentDescription="Profil in Simulation übernehmen"}){Glyph("play",Blue,Modifier.size(28.dp))}
+        DocumentPreview(profile,displayedGroups,if(profile.kind=="epassport")Modifier.fillMaxWidth().aspectRatio(720f/550f)else Modifier.fillMaxWidth().aspectRatio(856f/540f).clickable(role=Role.Button,onClickLabel=if(back)"Vorderseite anzeigen" else "Rückseite anzeigen"){back=!back},mrz=displayedMrz,portraitOverride=portrait,back=back)
+        if(profile.kind=="eid") {
+            val warnings=buildList {
+                if(!eidActive)add("eID deaktiviert")
+                if(transport)add("Transport-PIN aktiv – persönliche PIN setzen")
+                if(retries.toIntOrNull()==0)add("PIN gesperrt")
+                else if(retries.toIntOrNull() in 1..2)add("Noch $retries PIN-Versuche")
+                if(uses.toIntOrNull()==0)add("PUK verbraucht – Entsperren nicht mehr möglich")
+            }
+            if(warnings.isNotEmpty())Row(Modifier.fillMaxWidth().testTag("credential-warning").padding(horizontal=10.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("⚠",color=Color(0xffb58100),fontSize=20.sp)
+                Text(warnings.joinToString(" · "),color=Color(0xff8a6300),fontSize=12.sp,modifier=Modifier.weight(1f))
+            }
         }
-        DocumentPreview(profile,displayedGroups,if(profile.kind=="epassport")Modifier.fillMaxWidth().aspectRatio(125f/88f)else Modifier.fillMaxWidth().aspectRatio(856f/540f),mrz=displayedMrz)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Pale).padding(3.dp)) {
+        Row(Modifier.fillMaxWidth()) {
             listOf("Datengruppen","Einstellungen").forEachIndexed { index,label ->
                 val active=groups==(index==0)
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if(active)Blue else Color.Transparent).clickable{groups=index==0}.padding(vertical=12.dp),contentAlignment=Alignment.Center) {Text(label,fontSize=12.sp,color=if(active)Color.White else Muted)}
+                Column(Modifier.weight(1f).clickable{groups=index==0}) {
+                    Row(Modifier.fillMaxWidth().height(48.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
+                        Glyph(if(index==0)"layers" else "gear",if(active)Navy else Muted,Modifier.size(21.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(label,fontSize=13.sp,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium,color=if(active)Navy else Muted)
+                    }
+                    HorizontalDivider(thickness=if(active)2.dp else 1.dp,color=if(active)Navy else Border)
+                }
             }
         }
         if(!profile.simulatable)Text("Nicht simulierbar: ${profile.simulationError}",fontSize=11.sp,color=MaterialTheme.colorScheme.error)
-        Column(Modifier.weight(1f).testTag("editor-fields").verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f).testTag("editor-fields").onSizeChanged{fieldHeight=it.height}.verticalScroll(fieldScroll),verticalArrangement=Arrangement.spacedBy(if(groups)0.dp else 10.dp)) {
             if(groups) {
-                (if(profile.kind=="eid")(1..22).filter{it!=16}.map{"DG$it"} else profile.groups.keys().asSequence().sortedBy{it.removePrefix("DG").toInt()}.toList()).forEach { key ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp,Border,RoundedCornerShape(12.dp)).clickable{if(profile.kind=="epassport"&&key=="DG2")face=true else onEditGroup(key,displayedGroups.optString(key))}.padding(horizontal=15.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
+                (if(profile.kind=="eid")eidGroupOrder(profile.documentType()) else profile.groups.keys().asSequence().sortedBy{it.removePrefix("DG").toInt()}.toList()).forEach { key ->
+                    val disabled=profile.kind=="eid"&&key in listOf("DG21","DG22")
+                    Row(Modifier.fillMaxWidth().testTag("group-$key").then(if(profile.kind=="eid"&&key==eidBackStart(profile.documentType()))Modifier.onGloballyPositioned{backOffset=it.positionInParent().y}else Modifier).heightIn(min=68.dp).clickable(enabled=!disabled){if(profile.kind=="epassport"&&key=="DG2")face=true else onEditGroup(key,displayedGroups.optString(key))}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
+                        if(profile.kind=="epassport"&&key=="DG2"&&displayedPortrait!=null)Image(displayedPortrait!!,contentDescription=null,modifier=Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
+                        else Box(Modifier.size(40.dp).background(Color(0xffeef2f6),androidx.compose.foundation.shape.CircleShape),contentAlignment=Alignment.Center){Glyph(if(profile.kind=="eid")when(key){"DG4","DG5"->"person";"DG8"->"calendar";"DG9"->"place";else->"file"}else "file",Navy,Modifier.size(21.dp))}
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Text(if(profile.kind=="epassport"&&key=="DG2")"Gesichtsbild ansehen" else groupValue(profile.kind,key,displayedGroups.optString(key)),fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy,maxLines=12,overflow=TextOverflow.Ellipsis)
+                            Text(if(profile.kind=="epassport"&&key=="DG1")listOf(profileField(profile,displayedGroups,"given_names"),profileField(profile,displayedGroups,"surname")).joinToString(" ") else if(profile.kind=="epassport"&&key=="DG2")"Gesichtsbild ansehen" else if(profile.kind=="eid"&&key in listOf("DG3","DG8","DG15"))passportDate(groupValue(profile.kind,key,displayedGroups.optString(key))) else groupValue(profile.kind,key,displayedGroups.optString(key)),fontSize=14.sp,fontWeight=FontWeight.Bold,color=if(disabled)Muted.copy(alpha=.45f)else Navy,maxLines=2,overflow=TextOverflow.Ellipsis)
                             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)) {
-                                Text(key,fontSize=10.sp,fontWeight=FontWeight.SemiBold,color=Blue,modifier=Modifier.background(Pale,RoundedCornerShape(4.dp)).padding(horizontal=5.dp,vertical=3.dp))
+                                Text(key+" ·",fontSize=11.sp,color=Muted)
                                 Text(groupDescription(profile.kind,key),fontSize=11.sp,color=Muted)
                             }
                         }
-                        Spacer(Modifier.width(10.dp));Glyph("edit",Blue,Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp));Glyph("chevron",Muted,Modifier.size(18.dp))
                     }
+                    HorizontalDivider(color=Border)
                 }
             } else if(profile.passportCatalog) {
+                ProfileSettingsSection("Zugangsdaten","privacy","credential-settings") {
                 Text("Originales Simulatorprofil. Zugangsdaten und signierte Datengruppen bleiben unverändert.",fontSize=13.sp,color=Muted)
                 Text("CAN: $can\nPIN: ${pin.ifEmpty{"Nicht hinterlegt"}}\nPUK: ${puk.ifEmpty{"Nicht hinterlegt"}}",fontSize=14.sp,fontWeight=FontWeight.Bold,color=Navy)
+                }
             } else {
+                ProfileSettingsSection("Zugangsdaten","privacy","credential-settings") {
+                if(profile.kind=="eid")OutlinedTextField(documentNumber,{input->
+                    documentNumber=input.uppercase(java.util.Locale.ROOT).filter{it in 'A'..'Z'||it in '0'..'9'}.take(9)
+                    if(documentNumber.isNotEmpty())onDocumentNumber(documentNumber)
+                },label={Text("Dokumentnummer")},supportingText={Text("Wird für die automatisch berechnete MRZ verwendet.")},isError=documentNumber.isEmpty(),singleLine=true,modifier=Modifier.fillMaxWidth())
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                     listOf(Triple("CAN",can,{v:String->can=v}),Triple(if(transport)"Transport-PIN (5 Ziffern)" else "PIN",pin,{v:String->pin=v})).forEach { (label,value,change) ->
                         OutlinedTextField(value,{change(it.filter(Char::isDigit).take(if(label.startsWith("Transport-PIN"))5 else 6))},label={Text(label)},singleLine=true,modifier=Modifier.weight(1f).semantics{contentDescription=label},shape=RoundedCornerShape(12.dp),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))
@@ -223,11 +273,29 @@ import org.json.JSONObject
                     }
                     Text("Transport-PIN: 5 Ziffern, erst nach PIN-Änderung online nutzbar. Deaktivierte eID: PIN-Zugriff gesperrt; CAN-Verwaltung bleibt möglich.",fontSize=11.sp,color=Muted)
                 }
+                }
             }
             if(!groups) {
-                if(profile.signedFixture||profile.passportCatalog)Action("Bearbeitbare Kopie erstellen",false,onClick=onCopy)
-                Action("Profil importieren",false,onClick=onImport)
-                Action("Profil exportieren",false,enabled=valid,onClick=onExport)
+                if(profile.kind=="eid")RiSettings(profile,onCoreState)
+                ProfilePkiOptions(profile.kind,profile.pkiInfrastructure,profile.signedFixture,cloudVerified,onPki)
+                ProfileSettingsSection("Personalisierung","gear","personalization-settings") {
+                    Action("Personalisierungsdaten zurücksetzen",false,onClick={reset=true})
+                    if(profile.signedFixture||profile.passportCatalog)Action("Bearbeitbare Kopie erstellen",false,onClick=onCopy)
+                }
+                if(profile.kind=="eid") {
+                    ProfileSettingsSection("Schattenriss","person","portrait-settings") {
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                            listOf("" to "Automatisch","M" to "Männlich","F" to "Weiblich").forEach{(value,label)->
+                                FilterChip(selected=portrait==value,onClick={if(onPortrait(value))portrait=value},label={Text(label,fontSize=11.sp)},modifier=Modifier.testTag("portrait-${value.ifEmpty{"auto"}}"))
+                            }
+                        }
+                        Text("Nur Dokumentdarstellung.",fontSize=11.sp,color=Muted)
+                    }
+                }
+                ProfileSettingsSection("Profil übertragen","import","profile-transfer-settings") {
+                    Action("Profil importieren",false,onClick=onImport)
+                    Action("Profil exportieren",false,enabled=valid,onClick=onExport)
+                }
             }
         }
         if(!groups&&!valid)Text("Bitte vollständige Zugangsdaten eingeben. Die letzte gültige Einstellung bleibt gespeichert.",fontSize=11.sp,color=MaterialTheme.colorScheme.error)

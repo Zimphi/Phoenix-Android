@@ -1,1 +1,1 @@
-<resources><style name="AppTheme" parent="AppTheme.Base"><item name="android:windowSplashScreenAnimatedIcon">@drawable/phoenix_favicon</item><item name="android:windowSplashScreenBackground">#FAFBFF</item></style></resources>
+<resources><style name="AppTheme" parent="AppTheme.Base"><item name="android:windowSplashScreenAnimatedIcon">@drawable/phoenix_splash</item><item name="android:windowSplashScreenBackground">#FCFCFF</item></style></resources>

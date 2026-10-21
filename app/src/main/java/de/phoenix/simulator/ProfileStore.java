@@ -9,16 +9,23 @@ import org.json.*;
 
 final class ProfileStore {
     private final AtomicFile file;
+    private final AtomicFile defaultsFile;
+    private final Map<String,String> originals=new LinkedHashMap<>();
     final List<Profile> profiles = new ArrayList<>();
     ProfileStore(Context context) throws Exception {
         file=new AtomicFile(new File(context.getFilesDir(),"profile-drafts.json"));
+        defaultsFile=new AtomicFile(new File(context.getFilesDir(),"profile-personalization-defaults.json"));
+        if(defaultsFile.getBaseFile().exists())try(InputStream input=defaultsFile.openRead()) {
+            JSONArray saved=new JSONArray(read(input,16*1024*1024));
+            if(saved.length()>200)throw new IOException("Zu viele Ausgangsprofile");
+            for(int i=0;i<saved.length();i++){Profile original=Profile.parse(saved.getJSONObject(i));originals.put(original.id,original.json().toString());}
+        }
         JSONArray list;
         if (file.getBaseFile().exists()) {
             try(InputStream input=file.openRead()) { list=new JSONArray(read(input,16*1024*1024)); }
         } else list=Profile.defaults();
         if(list.length()>200)throw new IOException("Zu viele gespeicherte Profile");
         for(int i=0;i<list.length();i++) profiles.add(Profile.parse(list.getJSONObject(i)));
-        boolean changed=false;
         JSONObject supplied=NativeCore.call(new JSONObject().put("op","passport_catalog"));
         Set<String> retired=new HashSet<>();
         JSONArray retiredIds=supplied.getJSONArray("retired_ids");
@@ -35,7 +42,6 @@ final class ProfileStore {
             for(int i=0;i<removed.length();i++)if(recorded.add(removed.getJSONObject(i).toString()))previous.put(removed.getJSONObject(i));
             write(archive,previous);
             profiles.removeIf(profile->profile.kind.equals("epassport")&&retired.contains(profile.id));
-            changed=true;
         }
         JSONArray passports=supplied.getJSONArray("profiles");
         for(int i=0;i<passports.length();i++) {
@@ -44,9 +50,9 @@ final class ProfileStore {
             for(Profile profile:profiles)if(profile.id.equals(draft.getString("id")))found=profile;
             if(found!=null&&!original(found,draft)) {
                 Profile preserved=Profile.parse(found.json().put("id","own-"+UUID.randomUUID()));
-                profiles.set(profiles.indexOf(found),preserved);found=null;changed=true;
+                profiles.set(profiles.indexOf(found),preserved);found=null;
             }
-            if(found==null){if(profiles.size()>=200)throw new IOException("Maximal 100 Profile");found=Profile.parse(draft);profiles.add(found);changed=true;}
+            if(found==null){if(profiles.size()>=200)throw new IOException("Maximal 100 Profile");found=Profile.parse(draft);profiles.add(found);}
             found.passportCatalog=true;found.simulatable=draft.getBoolean("simulatable");found.simulationError=draft.optString("simulation_error","");
         }
         JSONArray catalog;
@@ -55,9 +61,13 @@ final class ProfileStore {
             JSONObject draft=catalog.getJSONObject(i);
             boolean present=false;
             for(Profile profile:profiles) if(profile.id.equals(draft.getString("id"))) { profile.signedFixture=true; present=true; }
-            if(!present && profiles.size()<200) {Profile profile=Profile.parse(draft);profile.signedFixture=true;profiles.add(profile);changed=true;}
+            if(!present && profiles.size()<200) {Profile profile=Profile.parse(draft);profile.signedFixture=true;profiles.add(profile);}
         }
-        if(changed)save();
+        for(JSONArray source:new JSONArray[]{Profile.defaults(),passports,catalog})for(int i=0;i<source.length();i++){
+            Profile original=Profile.parse(source.getJSONObject(i));
+            originals.put(original.id,original.json().toString());
+        }
+        save();
     }
     private static boolean original(Profile profile,JSONObject draft) throws JSONException {
         JSONObject groups=draft.getJSONObject("groups"),settings=draft.getJSONObject("settings");
@@ -81,7 +91,28 @@ final class ProfileStore {
     }
     void save() throws Exception {
         JSONArray list=new JSONArray(); for(Profile profile:profiles) list.put(profile.json());
+        for(Profile profile:profiles)if(!originals.containsKey(profile.id)) {
+            JSONObject baseline=profile.json();
+            if(profile.baselineGroups!=null)baseline.put("groups",profile.baselineGroups);
+            originals.put(profile.id,baseline.toString());
+        }
+        originals.keySet().retainAll(profiles.stream().map(p->p.id).collect(java.util.stream.Collectors.toSet()));
+        for(Profile profile:profiles)if(profile.kind.equals("eid"))profile.baselineGroups=new JSONObject(originals.get(profile.id)).getJSONObject("groups");
+        JSONArray baselines=new JSONArray();for(String value:originals.values())baselines.put(new JSONObject(value));
+        write(defaultsFile,baselines);
         write(file,list);
+    }
+    Profile resetPersonalization(Profile profile) throws Exception {
+        String baseline=originals.get(profile.id);
+        if(baseline==null)throw new IOException("Ausgangsstand nicht verfügbar");
+        Profile restored=Profile.parse(new JSONObject(baseline));
+        restored.signedFixture=profile.signedFixture;restored.passportCatalog=profile.passportCatalog;
+        restored.simulatable=profile.simulatable;restored.simulationError=profile.simulationError;
+        restored.personalizationGeneration=UUID.randomUUID().toString();
+        int index=profiles.indexOf(profile);if(index<0)throw new IOException("Profil nicht gefunden");
+        profiles.set(index,restored);
+        try{save();}catch(Exception error){profiles.set(index,profile);throw error;}
+        return restored;
     }
     private static void write(AtomicFile file,JSONArray list) throws Exception {
         byte[] bytes=list.toString(2).getBytes(StandardCharsets.UTF_8);

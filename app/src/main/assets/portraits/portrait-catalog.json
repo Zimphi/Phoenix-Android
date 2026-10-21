@@ -1,0 +1,20 @@
+{
+  "shadow-male": {
+    "label": "Schattenriss männlich",
+    "file": "portrait-male.jpg",
+    "preview": "portrait-male.png",
+    "sex": "M",
+    "person": {},
+    "sha256": "ac1010228e657befd28e816473a2238b558a6936a3ed18eef08f036846ac67c6",
+    "preview_sha256": "d55fc2b38ea8e3bfd2be994459f7261d4248fa963bae649f5067b2f4fc820def"
+  },
+  "shadow-female": {
+    "label": "Schattenriss weiblich",
+    "file": "portrait-female.jpg",
+    "preview": "portrait-female.png",
+    "sex": "F",
+    "person": {},
+    "sha256": "6c580413cb9ec404ebdc3f392a92cbe35a04f8a8849555f9c61b45e7b06d94d1",
+    "preview_sha256": "2dccc1ba392a34ba9ff9c56a66b48a972deb3e7b4ae9df0ffef3e9c48827be66"
+  }
+}
