@@ -53,3 +53,18 @@ Cloud enrollment and PKI live together under Settings → Cloud connection. The 
 capture activity is private and fixed to portrait. The interactive account test
 requires a fresh real web QR code and is intentionally separate from unattended
 UI tests: `npx e2e run --config e2e.account.config.ts`.
+
+## Device verification, 21 October 2026
+
+The installed debug build passed seven current TesterArmy tests on the connected
+Samsung SM-S918B: document editor (three), simulation selection (three), and the
+profile/simulation/About/settings UI walkthrough (one). The separate file-transfer
+test also exercised a real Android document export and import cancellation.
+Thirteen Python repository checks and the on-device native smoke instrumentation
+passed; the Android build and lint passed. Reference-based ID/passport screenshots
+were inspected for clipping and field placement. Protocol source is unchanged.
+
+Real QR enrollment and revocation were exercised, but the full account-overview
+test with the new central account attributes remains pending service deployment
+and a fresh device QR. Online PKI issuance and the live Vercel catalogue database
+migration are not covered by these Android UI checks.

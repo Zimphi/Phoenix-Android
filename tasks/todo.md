@@ -11,7 +11,7 @@
 - [x] Dokumentdarstellungen in Profilübersicht und Editor, Navigationsabstände sowie Einstellungen ohne Speicherbutton/Profilnamen mit e2e prüfen.
 - [x] Dokumentgestaltung anhand der Pass-/Ausweismuster überarbeitet; aktuelle Profildaten, DG2-Porträt und strukturierte DG1-/Länderauswahl am Smartphone geprüft.
 - [x] Import/Export unten in den Profileinstellungen; JSON-Export über Android-Dateiauswahl und Import-Abbruch am Smartphone geprüft.
-- [ ] Abschließende UI-Gesamtprüfung, Graphify und gezielter Android-Commit/Push.
+- [x] Abschließende UI-Gesamtprüfung (7 Gerätetests), Graphify und gezielter Android-Commit/Push (`88ef443`).
 - [ ] Gemeinsamen nationalen Katalog mit acht synthetischen Profilen auch in die laufende Vercel-Profildatenbank übernehmen; private Core- und lokale Host-Stände sind gepusht, eigene Profile bleiben erhalten.
 
 - [x] Unabhängige App-Quellcodeprüfung abgeschlossen: ein niedriger IFD-Verfügbarkeitsbefund, kein bestätigter Daten-/Schlüsselzugriffs-Bypass.
