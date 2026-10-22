@@ -1,11 +1,15 @@
 package de.phoenix.simulator
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -47,7 +51,24 @@ import kotlinx.coroutines.withContext
         }
         if(connected)AccountIdentity(identity,device.environment())
         Surface(color=Pale,shape=androidx.compose.foundation.shape.RoundedCornerShape(14.dp)) {
-            Text(message,Modifier.fillMaxWidth().padding(16.dp),fontSize=14.sp,color=Navy)
+            Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                val status=if(connected)"Angemeldet" else "Nicht angemeldet"
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Canvas(Modifier.size(22.dp).semantics{contentDescription=status}) {
+                        val color=if(connected)Color(0xff218348)else Color(0xffc73545)
+                        val stroke=2.5.dp.toPx()
+                        if(connected) {
+                            drawLine(color,Offset(size.width*.16f,size.height*.52f),Offset(size.width*.40f,size.height*.76f),stroke,StrokeCap.Round)
+                            drawLine(color,Offset(size.width*.40f,size.height*.76f),Offset(size.width*.86f,size.height*.24f),stroke,StrokeCap.Round)
+                        } else {
+                            drawLine(color,Offset(size.width*.24f,size.height*.24f),Offset(size.width*.76f,size.height*.76f),stroke,StrokeCap.Round)
+                            drawLine(color,Offset(size.width*.76f,size.height*.24f),Offset(size.width*.24f,size.height*.76f),stroke,StrokeCap.Round)
+                        }
+                    }
+                    Text(status,fontSize=14.sp,fontWeight=FontWeight.SemiBold,color=Navy)
+                }
+                if(message!=status)Text(message,fontSize=14.sp,color=Navy)
+            }
         }
         if(!connected) {
             Text("Öffne die Phoenix-Web-Einstellungen und scanne den Geräte-QR-Code, um dich anzumelden und die zentrale PKI zu verwenden.",fontSize=14.sp,color=Muted)
