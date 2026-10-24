@@ -1,30 +1,27 @@
 # Konzept: verschlüsselter Upload von NFC-Diagnoselogs
 
-Stand 24. Oktober 2026. Vorschlag, nicht implementiert. Es werden weder Logs
-automatisch hochgeladen noch ein Server eingerichtet.
+Stand 24. Oktober 2026. Android-Upload, separater Worker und Studio-Sammelabruf sind implementiert und lokal geprüft. Der Bereitstellungsstand und die noch offenen Live-Abnahmen stehen im Worker-README. Uploads erfolgen ausschließlich nach ausdrücklicher Bestätigung. Laufzeitvertrag und Bereitstellung: `diagnostics-worker/README.md`; Studio-Bedienung: `Phoenix-License-Studio/docs/NFC-DIAGNOSTICS.md`.
 
-## Empfohlenes Serverziel
+## Serverziel ohne kostenpflichtiges Abo
 
-Ein eigener Cloudflare-Worker nimmt Diagnose-Uploads an. Der bestehende Lizenz-
-Worker und seine Signier- und Lizenzberechtigungen bleiben getrennt. Vorgeschlagenes,
-noch nicht eingerichtetes Ziel: `https://diagnostics.epassport-simulator.de/v1/nfc-reports`.
-Die Domain gehört zum Worker, nicht zu einem öffentlich freigegebenen Bucket.
+Ein eigener Worker `phoenix-nfc-diagnostics` im zweiten Cloudflare-Konto verwendet
+seine eigene D1-Datenbank. Ziel ist
+`https://phoenix-nfc-diagnostics.phoenix-license-relay.workers.dev/v1/nfc-reports`.
+Der Lizenz-Worker und seine Datenbanken werden nicht verändert. Die OpenPGP-Datei
+wird zusammen mit den minimalen Metadaten atomar als D1-BLOB gespeichert.
+Es gibt kein R2-Abo und kein Upgrade auf einen kostenpflichtigen Tarif.
 
-Der Worker schreibt die bereits PGP-verschlüsselte Datei in einen eigenen privaten
-R2-Bucket per Bucket-Binding. Kein `r2.dev`-Zugang und keine öffentliche Bucket-
-Domain. R2-Buckets sind standardmäßig privat; die Bindung erlaubt Zugriff aus
-dem Worker. [R2 aus Workers](https://developers.cloudflare.com/r2/api/workers/workers-api-usage/),
-[Private/public R2-Buckets](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+Grenzen: 1 MiB JSON, 1.900.000 Byte Ciphertext, 20 Reservierungen pro Nutzer/Tag,
+200 insgesamt/Tag und 64 MiB logisches aktives Speicherbudget. Bei ausgeschöpften
+Grenzen wird der Upload abgelehnt; lokales Exportieren bleibt möglich. D1 Free
+begrenzt zusätzlich Anfragen und Speicher. Die 10-ms-CPU-Grenze des Workers muss
+mit synthetischen großen Dateien im echten Tarif geprüft werden.
 
-Die Datenbank enthält nur Report-ID, Besitzerzuordnung, Objektpfad, Dateigröße,
-Ciphertext-Hash, Empfänger-Fingerabdruck, Uploadstatus sowie Erstellungs- und
-Löschfrist. Dafür wird eine eigene Tabelle mit engen Zugriffsrechten verwendet;
-der Diagnose-Worker erhält keinen allgemeinen Zugang zu Lizenz- oder PKI-Daten.
-Gerätemetadaten und Loginhalt stehen nur in der verschlüsselten Datei.
-
-Vercel mit privatem Blob-Storage wäre ebenfalls möglich. Für diesen Vorschlag ist
-der getrennte Worker mit R2 die bevorzugte Variante; Datenbank und Dateispeicher
-haben unterschiedliche Aufgaben. Es wurde kein Cloud-Ressource angelegt oder deployt.
+Aktive Berichte laufen nach 14 Tagen ab; Bereinigung alle 15 Minuten. D1s
+verschlüsselte Sicherungshistorie kann Daten nach Löschung noch bis zu sieben
+weitere Tage enthalten. Geräte-/Bibliotheksmetadaten bleiben ausschließlich im
+PGP-Inhalt. Die Datenbank enthält außen ID, Besitzerzuordnung, Status, Fristen,
+Größe und Ciphertext-Prüfsumme; keine Geräteinventare oder persönlichen Dokumente.
 
 ## Nutzerablauf
 
@@ -77,7 +74,7 @@ nicht: Ein kompromittierter Upload-Server könnte ihn austauschen. Manifestprüf
 umfasst Signatur, Gültigkeitszeit, freigegebene Fingerabdrücke und Widerrufe. Bei einem
 Fehler gibt es keinen Klartext-Fallback und keine selbst entworfene Kryptografie.
 
-Upload-Worker, Datenbank und R2 besitzen keinen privaten OpenPGP-Schlüssel und
+Upload-Worker, Datenbank besitzen keinen privaten OpenPGP-Schlüssel und
 keine Entsperrpassphrase. Berechtigte Supportmitarbeiter laden die `.pgp`-Datei
 herunter; entschlüsselt wird separat mit dem privaten Verschlüsselungs-Unterschlüssel
 des oben genannten Empfängers, zunächst lokal/offline. Die private Schlüsselhaltung
@@ -93,7 +90,7 @@ Entschlüsselung wäre eine separate Entscheidung samt eigener Schlüsselverwalt
 2. Die App prüft Schema und Größenlimit und verschlüsselt das JSON mit dem
    freigegebenen OpenPGP-Empfängerschlüssel. Report-ID und Nonce stehen auch im
    verschlüsselten Inhalt. Geräte-/Diagnosefelder bleiben ausschließlich innen.
-3. Ein authentifizierter HTTPS-POST überträgt die OpenPGP-Datei als undurchsichtige
+3. Ein authentifizierter HTTPS-PUT überträgt die OpenPGP-Datei als undurchsichtige
    Daten. Der Server prüft Uploadrecht, Besitzer, Ablauf, erwartete Report-ID/Nonce,
    deklarierte Empfänger-Fingerabdrücke und harte Streaming-Größenlimits. Er kann
    weder den tatsächlichen Empfänger noch den inneren Kontext ohne Entschlüsselung
@@ -104,7 +101,7 @@ Entschlüsselung wäre eine separate Entscheidung samt eigener Schlüsselverwalt
 4. Die App erhält eine zufällige Vorgangsnummer und Quittung. Abruf und Löschen
    erfordern erneut Eigentümerrechte; eine erratene Report-ID genügt nicht.
 
-Vorschlag für die erste Version: höchstens 1 MiB JSON und 2 MiB OpenPGP-Datei, ohne Archive
+Vorschlag für die erste Version: höchstens 1 MiB JSON und 1.900.000 Byte OpenPGP-Datei, ohne Archive
 oder Kompression. Die derzeitigen vollständigen Logs liegen deutlich darunter.
 Limits pro Konto und IP begrenzen Missbrauch. Objektpfade erzeugt allein der
 Server; keine vom Client vorgegebenen Dateipfade oder beliebigen Download-URLs.
@@ -144,6 +141,6 @@ Ein allgemeiner anonymer Upload-Bucket ist nicht Teil dieses Vorschlags.
   automatische Fristen, Backup-Retention und Audit-Zugriff sind praktisch überprüft.
 
 Umsetzung in kleinen Schritten: Export-Allowlist festschreiben, OpenPGP lokal testen,
-eigenen Diagnose-Worker mit privatem R2 und authentifizierter API mit Limits bauen,
+eigenen Diagnose-Worker mit separatem D1-Speicher und authentifizierter API mit Limits bauen,
 separate Entschlüsselung und Schlüsselrotation prüfen,
 Angriffs- und Löschtests durchführen, dann optional in der App freigeben.

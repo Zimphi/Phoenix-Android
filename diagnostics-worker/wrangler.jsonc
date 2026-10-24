@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "phoenix-nfc-diagnostics",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-24",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://phoenix-nfc-diagnostics.phoenix-license-relay.workers.dev",
+    "AUTH_ENVIRONMENT": "production"
+  },
+  "ratelimits": [
+    {
+      "name": "AUTH_LIMITER",
+      "namespace_id": "73692341",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "phoenix-nfc-diagnostics",
+      "database_id": "3e6643b7-e4bd-4249-ac76-d940cf425501",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
+    ]
+  },
+  "account_id": "eae8c4b088e64e865f4552294a4397e0"
+}

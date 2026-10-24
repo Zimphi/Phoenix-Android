@@ -52,6 +52,8 @@ import org.json.JSONObject
     var exitConfirm by remember{mutableStateOf(false)}
     var codeDialog by remember{mutableStateOf(false)}
     var pairingCode by remember{mutableStateOf("")}
+    var uploadReport by remember{mutableStateOf<String?>(null)}
+    val uploadClient=remember(context){NfcUploadClient(context.applicationContext)}
     val saver=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
         val report=export;export=null;session.exportFinished()
         if(uri!=null&&report!=null)scope.launch {
@@ -183,6 +185,7 @@ import org.json.JSONObject
                         }
                     }
                     if(state.report!=null)Action("Gemeinsames Log speichern",modifier=Modifier.testTag("nfc-test-save"),onClick=::save)
+                    if(state.report!=null)Action("Log sicher senden",primary=false,modifier=Modifier.testTag("nfc-test-upload"),onClick={uploadReport=state.report})
                     if(state.connected)Action("Test wiederholen",primary=false,onClick=session::repeat)
                     else Action("Erneut koppeln",primary=false,onClick=session::reset)
                     if(state.connected)TextButton(onClick=session::disconnect){Text("Verbindung trennen")}
@@ -193,6 +196,7 @@ import org.json.JSONObject
                     if(state.report!=null){
                         NfcTestNote("Das gemeinsame JSON-Log enthält Gerätestände, Schritte und Ergebnisse beider Telefone. Keine Dokumentinhalte, Schlüssel oder Kopplungscodes.")
                         Action("Gemeinsames Log speichern",onClick=::save)
+                        Action("Log sicher senden",primary=false,onClick={uploadReport=state.report})
                     }
                     Action("Neuen Test vorbereiten",primary=false,onClick=session::reset)
                     Action("Fertig",primary=false,onClick=onExit)
@@ -202,6 +206,7 @@ import org.json.JSONObject
             Spacer(Modifier.height(12.dp))
         }
     }
+    uploadReport?.let{report->NfcUploadDialog(report,uploadClient::send,uploadClient::delete){uploadReport=null}}
     if(codeDialog)AlertDialog(onDismissRequest={codeDialog=false;pairingCode=""},title={Text("Mit Kopplungscode verbinden")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
         Text("Gib den sechsstelligen Code unter dem QR-Code auf dem Master ein. Beide Telefone müssen im selben WLAN sein.")
         OutlinedTextField(pairingCode,{pairingCode=it.filter{digit->digit in '0'..'9'}.take(6)},label={Text("Kopplungscode")},singleLine=true,

@@ -383,7 +383,7 @@ internal class NfcTestSession(private val activity:Activity):AutoCloseable {
                 put(clean)
             }
         }
-        private fun cleanCard(input:JSONObject)=JSONObject().apply {
+        internal fun cleanCard(input:JSONObject)=JSONObject().apply {
             for(key in listOf("selected","control","trigger","deactivated"))put(key,input.getBoolean(key))
             val entries=input.getInt("entries");require(entries in 0..1000);put("entries",entries)
             put("apdus",cleanApdus(input.getJSONArray("apdus"),32))
