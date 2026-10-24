@@ -416,7 +416,7 @@ import org.json.JSONObject
         if(username!=null&&username!=name)Text(username,fontSize=15.sp,color=Navy,textAlign=TextAlign.Center)
         if(email!=null)Text(email,fontSize=14.sp,color=Muted,textAlign=TextAlign.Center)
         Text("Benutzerkennung",fontSize=12.sp,color=Muted)
-        androidx.compose.foundation.text.selection.SelectionContainer{Text(identity.optString("user_id").ifBlank{"Wird geladen …"},fontSize=12.sp,color=Navy,textAlign=TextAlign.Center)}
+        androidx.compose.foundation.text.selection.SelectionContainer{Text(identity.optString("account_id").ifBlank{"Wird geladen …"},fontSize=12.sp,color=Navy,textAlign=TextAlign.Center)}
         if(environment!=null)Text(if(environment=="preview")"Preview" else "Produktion",fontSize=12.sp,color=Muted)
     }
 }

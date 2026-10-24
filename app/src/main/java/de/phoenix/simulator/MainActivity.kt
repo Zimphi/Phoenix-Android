@@ -25,17 +25,22 @@ import kotlinx.coroutines.*
 import org.json.JSONObject
 
 class MainActivity:ComponentActivity() {
+    private val mobileAuth by lazy{MobileAuth(this)}
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
         if(android.os.Build.VERSION.SDK_INT>=31)splashScreen.setOnExitAnimationListener{it.remove()}
-        setContent { MaterialTheme(typography=PhoenixTypography,colorScheme=lightColorScheme(primary=Blue,onPrimary=androidx.compose.ui.graphics.Color.White,background=Page,surface=Page,onSurface=Navy)) { ProvideTextStyle(TextStyle(fontFamily=PhoenixFont,fontSize=14.sp,lineHeight=TextUnit.Unspecified,letterSpacing=0.sp)) { Phoenix() } } }
+        consumeAuthIntent(intent)
+        setContent { MaterialTheme(typography=PhoenixTypography,colorScheme=lightColorScheme(primary=Blue,onPrimary=androidx.compose.ui.graphics.Color.White,background=Page,surface=Page,onSurface=Navy)) { ProvideTextStyle(TextStyle(fontFamily=PhoenixFont,fontSize=14.sp,lineHeight=TextUnit.Unspecified,letterSpacing=0.sp)) { Phoenix(mobileAuth) } } }
     }
+    override fun onNewIntent(intent:Intent){super.onNewIntent(intent);consumeAuthIntent(intent)}
+    private fun consumeAuthIntent(value:Intent){value.data?.let{mobileAuth.acceptLink(it.toString());value.data=null}}
+    override fun onDestroy(){mobileAuth.close();super.onDestroy()}
     override fun onResume(){super.onResume();CardService.foreground(true);val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,CardService::class.java))}
     override fun onPause(){CardService.foreground(false);RemoteReader.stop();NfcAdapter.getDefaultAdapter(this)?.let{if(packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(it).unsetPreferredService(this)};super.onPause()}
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
-@Composable private fun Phoenix() {
+@Composable private fun Phoenix(mobileAuth:MobileAuth) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val account=remember{PkiDevice(context.applicationContext)}
@@ -46,6 +51,8 @@ class MainActivity:ComponentActivity() {
     var storeResult by remember{mutableStateOf<Result<ProfileStore>?>(null)}
     val store=storeResult?.getOrNull()
     var page by remember{mutableStateOf("Profile")}
+    LaunchedEffect(mobileAuth.opened){if(mobileAuth.opened>0)page="Cloud-Anbindung"}
+    LaunchedEffect(mobileAuth.completed){if(mobileAuth.completed>0)identity=account.identity()}
     var selected by remember{mutableStateOf<Profile?>(null)}
     var selectedKind by remember{mutableStateOf("eid")}
     var revision by remember{mutableIntStateOf(0)}
@@ -279,7 +286,7 @@ class MainActivity:ComponentActivity() {
                     }
                     "Über"->About(components)
                     "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"},{page="Cloud-Anbindung"})
-                    "Cloud-Anbindung"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())){PkiDeviceSettings(identity){identity=account.identity()}}
+                    "Cloud-Anbindung"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())){PkiDeviceSettings(identity,mobileAuth,{page="Profile"}){identity=account.identity()}}
                     "IFD-Schnittstelle"->ReaderSettings(remoteState,pairBusy,::pairReader,{
                         scope.launch{withContext(Dispatchers.IO){NativeCore.call(JSONObject().put("op","ifd_stop"))};remoteState=JSONObject()}
                     },{forgetPairing=true})
@@ -340,7 +347,7 @@ class MainActivity:ComponentActivity() {
     legal?.let{title->
         val text=remember(title){when(title){
             "Impressum"->"Phoenix Android\nhttps://github.com/Zimphi/Phoenix-Android\n\nVerantwortlichen- und Kontaktangaben sind vor Veröffentlichung einer App-Distribution zu ergänzen."
-            "Datenschutz"->"Diese Entwicklungsversion speichert synthetische Profilentwürfe lokal auf dem Gerät. Keine Analyse- oder Werbedienste.\n\nDie Hintergrundaktivierung verwendet den Phoenix Lizenz-Testrelay über HTTPS. Übermittelt werden pseudonyme Geräte- und Anfragehashes sowie die ausgewählten Core-Produkte. Der private Geräteschlüssel bleibt im Android Keystore. Die native Lizenzprüfung benötigt zusätzlich authentifizierte Zeit von Netnod bzw. Cloudflare. Profile und NFC-APDUs werden dafür nicht übertragen. Bei ausdrücklich gestarteter WLAN-Simulation wird das ausgewählte synthetische eID-Profil über eine verschlüsselte Remote-IFD-Verbindung an eine gekoppelte AusweisApp im lokalen Netzwerk übermittelt. Die Kopplung verwendet einen zeitlich begrenzten Code; anschließend werden die Kommunikationszertifikate geprüft. Beim Verlassen der Simulation oder beim Wechsel in den Hintergrund endet der WLAN-Kartenleser. Die optionale PKI-Geräteanmeldung sendet nach dem Scannen eines QR-Codes die Einmalberechtigung, den öffentlichen Geräteschlüssel, den Gerätenamen und signierte Anfragen an den im QR-Code festgelegten Phoenix-Server. Kennung und Schlüsselzuordnung bleiben lokal gespeichert; der private PKI-Geräteschlüssel bleibt im Android Keystore. Status und Abmeldung verwenden signierte HTTPS-Anfragen. Die Cloud-Simulation ist nicht umgesetzt."
+            "Datenschutz"->"Diese Entwicklungsversion speichert synthetische Profilentwürfe lokal auf dem Gerät. Keine Analyse- oder Werbedienste.\n\nDie Hintergrundaktivierung verwendet den Phoenix Lizenz-Testrelay über HTTPS. Übermittelt werden pseudonyme Geräte- und Anfragehashes sowie die ausgewählten Core-Produkte. Der private Geräteschlüssel bleibt im Android Keystore. Die native Lizenzprüfung benötigt zusätzlich authentifizierte Zeit von Netnod bzw. Cloudflare. Profile und NFC-APDUs werden dafür nicht übertragen. Bei ausdrücklich gestarteter WLAN-Simulation wird das ausgewählte synthetische eID-Profil über eine verschlüsselte Remote-IFD-Verbindung an eine gekoppelte AusweisApp im lokalen Netzwerk übermittelt. Die Kopplung verwendet einen zeitlich begrenzten Code; anschließend werden die Kommunikationszertifikate geprüft. Beim Verlassen der Simulation oder beim Wechsel in den Hintergrund endet der WLAN-Kartenleser. Die optionale Phoenix-Cloud-Registrierung übermittelt deine E-Mail-Adresse an Phoenix und dessen Authentifizierungsdienst. Mail-Link oder Einmalcode bestätigen die Registrierung; Passkeys dienen anschließend zur Anmeldung. Fingerabdruck, Gesichtsdaten und Geräte-PIN bleiben beim Gerät beziehungsweise Passkey-Anbieter. Offene Registrierung und Geräteverbindung werden mit einem Android-Keystore-Schlüssel verschlüsselt gespeichert. Die sichtbare Benutzerkennung ist ein serverseitig mit HMAC-SHA-256 abgeleitetes Pseudonym; Phoenix kann es deinem Konto zuordnen. Die optionale PKI-Geräteanmeldung sendet nach dem Scannen eines QR-Codes die Einmalberechtigung, den öffentlichen Geräteschlüssel, den Gerätenamen und signierte Anfragen an den im QR-Code festgelegten Phoenix-Server. Kennung und Schlüsselzuordnung bleiben lokal gespeichert; der private PKI-Geräteschlüssel bleibt im Android Keystore. Status und Abmeldung verwenden signierte HTTPS-Anfragen. Die Cloud-Simulation ist nicht umgesetzt."
             else->context.assets.open("THIRD_PARTY_NOTICES.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LICENSE.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("LGPL-2.1.txt").use{ProfileStore.read(it)}+"\n\n"+context.assets.open("ODbL-1.0.txt").use{ProfileStore.read(it)}
         }}
         AlertDialog(onDismissRequest={legal=null},title={Text(title)},text={Text(text,Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()))},confirmButton={TextButton({legal=null},Modifier.semantics{testTagsAsResourceId=true}.testTag("close-legal")){Text("Schließen")}})

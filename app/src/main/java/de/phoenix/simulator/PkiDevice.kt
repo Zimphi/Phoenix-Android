@@ -110,6 +110,8 @@ internal class PkiDevice(private val context:Context) {
             val account=result.optJSONObject("account")
             require(account==null||account.getString("user_id")==owner){"Falsche Benutzerzuordnung"}
             val identity=JSONObject().put("user_id",owner)
+            val pseudonym=account?.optString("account_id")
+            if(pseudonym?.matches(Regex("phx_[0-9a-f]{64}"))==true)identity.put("account_id",pseudonym)
             for(key in listOf("username","display_name","email")) {
                 val value=account?.opt(key)
                 if(value is String&&value.length<=254&&!value.any{it.isISOControl()}&&value.isNotBlank())identity.put(key,value)
