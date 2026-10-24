@@ -9,8 +9,7 @@
     "enabled": false
   },
   "vars": {
-    "PUBLIC_ORIGIN": "https://phoenix-nfc-diagnostics.phoenix-license-relay.workers.dev",
-    "AUTH_ENVIRONMENT": "production"
+    "PUBLIC_ORIGIN": "https://phoenix-nfc-diagnostics.phoenix-license-relay.workers.dev"
   },
   "ratelimits": [
     {

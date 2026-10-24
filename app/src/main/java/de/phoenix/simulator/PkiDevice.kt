@@ -143,15 +143,18 @@ internal class PkiDevice(private val context:Context) {
     @Synchronized internal fun diagnosticsProof(origin:String,method:String,path:String,bodyHash:String,uploadNonce:String):Map<String,String> {
         val id=preferences.getString("id",null)?:error("Bitte zuerst in den Einstellungen bei Phoenix anmelden")
         val environment=preferences.getString("environment",null)?:error("Anmeldeumgebung fehlt")
-        check(environment=="production"){"Diagnose-Uploads benötigen die produktive Phoenix-Anmeldung"}
-        val authOrigin="https://epassport-simulator.de"
+        val authOrigin=when(environment){
+            "production"->"https://epassport-simulator.de"
+            "preview"->"https://preview.epassport-simulator.de"
+            else->error("Unbekannte Anmeldeumgebung")
+        }
         check(preferences.getString("origin",null)==authOrigin)
         val alias=preferences.getString("alias",null)?:error("Geräteschlüssel fehlt")
         val salt=NfcUploadProof.salt();val timestamp=System.currentTimeMillis()/1000
         val nonce=NfcUploadProof.nonce(origin,method,path,bodyHash,salt,uploadNonce)
         val signature=sign(alias,message("phoenix-device-request-v1",environment,"POST",authOrigin+"/api/auth/device/status",id,nonce,timestamp,hash("{}".toByteArray())))
         return mapOf("Authorization" to "PhoenixDevice $id","X-Phoenix-Nonce" to nonce,"X-Phoenix-Timestamp" to timestamp.toString(),
-            "X-Phoenix-Signature" to signature,"X-Phoenix-Diagnostics-Salt" to salt,"X-Report-Nonce" to uploadNonce)
+            "X-Phoenix-Signature" to signature,"X-Phoenix-Diagnostics-Environment" to environment,"X-Phoenix-Diagnostics-Salt" to salt,"X-Report-Nonce" to uploadNonce)
     }
     @Synchronized fun status():String {
         verifiedAt=0

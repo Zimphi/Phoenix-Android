@@ -11,14 +11,14 @@ const device=uuid(),other=uuid(),owner=uuid(),otherOwner=uuid();
 const keys=new Map([device,other].map(id=>[id,generateKeyPairSync('ec',{namedCurve:'prime256v1'})]));
 let mf,db,seen,authCalls;
 const encrypted=Buffer.from([0xc1,1,3,0xd2,...randomBytes(120)]);
-function proof(method,path,body,who=device,uploadNonce=''){
+function proof(method,path,body,who=device,uploadNonce='',environment='production'){
   const salt=randomBytes(32).toString('base64url');
   const nonce=hash(JSON.stringify(['phoenix-diagnostics-v1',origin,method,path,hash(body),salt,uploadNonce]));
   const timestamp=Math.floor(Date.now()/1000).toString();
-  const message=JSON.stringify(['phoenix-device-request-v1','production','POST','https://epassport-simulator.de/api/auth/device/status',who,nonce,Number(timestamp),hash('{}')]);
+  const message=JSON.stringify(['phoenix-device-request-v1',environment,'POST',(environment==='preview'?'https://preview.epassport-simulator.de':'https://epassport-simulator.de')+'/api/auth/device/status',who,nonce,Number(timestamp),hash('{}')]);
   return {'authorization':'PhoenixDevice '+who,'x-phoenix-nonce':nonce,'x-phoenix-timestamp':timestamp,
     'x-phoenix-signature':sign('sha256',Buffer.from(message),keys.get(who).privateKey).toString('base64'),
-    'x-phoenix-diagnostics-salt':salt,'x-report-nonce':uploadNonce};
+    'x-phoenix-diagnostics-environment':environment,'x-phoenix-diagnostics-salt':salt,'x-report-nonce':uploadNonce};
 }
 async function call(method,path,body='',who=device,nonce='',extra={}){
   const bytes=typeof body==='string'?Buffer.from(body):body;
@@ -38,11 +38,12 @@ beforeEach(async()=>{
     ratelimits:{AUTH_LIMITER:{namespace_id:'73692341',simple:{limit:10000,period:60}}},
     outboundService:async request=>{
       authCalls++;
-      assert.equal(request.url,'https://epassport-simulator.de/api/auth/device/status');
+      assert(['https://epassport-simulator.de/api/auth/device/status','https://preview.epassport-simulator.de/api/auth/device/status'].includes(request.url));
+      const environment=request.url.includes('://preview.')?'preview':'production';
       assert.equal(request.method,'POST');assert.equal(await request.text(),'{}');
       const h=request.headers,id=h.get('authorization')?.slice('PhoenixDevice '.length);
       const nonce=h.get('x-phoenix-nonce'),timestamp=Number(h.get('x-phoenix-timestamp'));
-      const message=JSON.stringify(['phoenix-device-request-v1','production','POST',request.url,id,nonce,timestamp,hash('{}')]);
+      const message=JSON.stringify(['phoenix-device-request-v1',environment,'POST',request.url,id,nonce,timestamp,hash('{}')]);
       const valid=keys.has(id)&&!seen.has(nonce)&&Math.abs(Date.now()/1000-timestamp)<61&&
         verify('sha256',Buffer.from(message),keys.get(id).publicKey,Buffer.from(h.get('x-phoenix-signature')||'','base64'));
       if(!valid)return Response.json({error:'denied'},{status:401});
@@ -167,3 +168,17 @@ test('D1 stores a full-sized bounded ciphertext and listings never select its pa
  const got=await call('GET',path);assert.equal(hash(Buffer.from(await got.arrayBuffer())),hash(bytes));
  assert.equal((await call('DELETE',path)).status,200);
 });
+
+ test('one service accepts both environments and prevents cross-environment ownership and signature substitution',async()=>{
+  const send=(method,path,body='',nonce='')=>mf.dispatchFetch(origin+path,{method,headers:{...proof(method,path,body,device,nonce,'preview'),...(method==='POST'?{'content-type':'application/json'}:method==='PUT'?{'content-type':'application/pgp-encrypted'}:{})},...(body.length?{body}:{})});
+  const reservation=await send('POST','/v1/nfc-reports',JSON.stringify({request_id:uuid()}));assert.equal(reservation.status,201);
+  const offer=await reservation.json(),path='/v1/nfc-reports/'+offer.id;
+  assert.equal((await send('PUT',path,encrypted,offer.nonce)).status,200);
+  assert.deepEqual(Buffer.from(await(await send('GET',path)).arrayBuffer()),encrypted);
+  assert.equal((await call('GET',path)).status,404);
+  assert.equal((await call('DELETE',path)).status,404);
+  assert.equal((await call('GET','/v1/nfc-reports','',''+device,'',{'x-phoenix-diagnostics-environment':'preview'})).status,401);
+  assert.equal((await call('GET','/v1/nfc-reports','',''+device,'',{'x-phoenix-diagnostics-environment':'invalid'})).status,401);
+  assert.equal((await send('DELETE',path)).status,200);
+  const production=await reserve();assert.equal((await send('GET','/v1/nfc-reports/'+production.id)).status,404);
+ });

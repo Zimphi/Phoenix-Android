@@ -19,7 +19,11 @@ hash and random salt. The worker recomputes that binding, forwards the standard
 proof and literal `{}` to the configured existing status endpoint, and requires
 matching authenticated device/user IDs. The backend consumes the nonce to prevent
 replay. Arbitrary upstream origins, redirects and caller-supplied URLs are rejected.
-Production and preview use separate, explicit worker deployments.
+One deployment accepts production and preview device proofs. The explicit
+`X-Phoenix-Diagnostics-Environment` header selects one of two fixed status verifiers;
+the existing signature binds that environment and verifier URL. Missing headers
+retain production compatibility. Preview owner IDs are namespaced in the same
+database, so matching UUIDs across environments do not share report access.
 
 * `POST /v1/nfc-reports`: authenticated reservation, returns random report ID,
   upload nonce and a five-minute expiry. Per-owner quotas apply atomically in D1.
@@ -81,3 +85,8 @@ Workers Free has a 10 ms CPU limit; local Miniflare tests do not prove productio
 CPU acceptance for the maximum-size payload. Run a live synthetic limit test.
 
 Revoking the Android device key prevents new uploads and owner API access, including later deletion requests. Existing ciphertext still expires after 14 days and can be removed by the Cloudflare operator if necessary. A client cancellation after a completed server write may leave an acknowledged-or-unknown encrypted copy until owner deletion or expiry; cancellation is not claimed to prove deletion.
+
+Verification on 2026-10-24: all eleven Miniflare/D1 tests pass, including both
+verifiers, environment substitution and cross-environment ownership denial.
+The installed S23 build completed a real synthetic encrypted upload and owner
+deletion using its existing preview enrollment against this single deployment.

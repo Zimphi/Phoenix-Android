@@ -45,8 +45,9 @@ async function authenticate(request,env,path,bytes){
   requireValue(Number(timestamp)>=seconds()-60&&Number(timestamp)<=seconds()+3,401,'stale_proof');
   const expected=await hash(encoded(JSON.stringify(['phoenix-diagnostics-v1',env.PUBLIC_ORIGIN,request.method,path,await hash(bytes),salt,uploadNonce])));
   requireValue(expected===nonce,401,'invalid_binding');
-  const upstream={production:'https://epassport-simulator.de',preview:'https://preview.epassport-simulator.de'}[env.AUTH_ENVIRONMENT];
-  requireValue(upstream,503,'configuration_error');
+  const environment=h.get('x-phoenix-diagnostics-environment')||'production';
+  const upstream={production:'https://epassport-simulator.de',preview:'https://preview.epassport-simulator.de'}[environment];
+  requireValue(typeof upstream==='string'&&['production','preview'].includes(environment),401,'invalid_environment');
   const headers={'content-type':'application/json'};
   for(const name of ['authorization','x-phoenix-nonce','x-phoenix-timestamp','x-phoenix-signature'])headers[name]=h.get(name);
   const response=await fetch(upstream+'/api/auth/device/status',{method:'POST',body:'{}',headers,redirect:'manual',signal:AbortSignal.timeout(8000)});
@@ -55,7 +56,7 @@ async function authenticate(request,env,path,bytes){
   const result=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(await bounded(response,16384)));
   requireValue(result.authenticated===true&&result.device_id===id&&UUID.test(result.user_id),401,'authentication_failed');
   requireValue((await env.AUTH_LIMITER.limit({key:'owner:'+result.user_id})).success,429,'rate_limited');
-  return result.user_id;
+  return environment==='preview'?'preview:'+result.user_id:result.user_id;
 }
 
 function offer(row){return {id:row.id,nonce:row.nonce,upload_expires_at:row.ticket_expires,
