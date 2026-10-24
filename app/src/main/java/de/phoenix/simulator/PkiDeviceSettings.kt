@@ -34,12 +34,13 @@ import kotlinx.coroutines.withContext
     var hasLocalKey by remember{mutableStateOf(device.hasLocalKey())}
     var screen by remember{mutableStateOf(if(connected)"success" else "welcome")}
     var code by remember{mutableStateOf("")}
+    var registrationName by remember{mutableStateOf("")}
     val busy=qrBusy||mobileAuth.busy
     val supportsPasskeys=android.os.Build.VERSION.SDK_INT>=28
     LaunchedEffect(mobileAuth.completed){connected=device.connected();hasLocalKey=device.hasLocalKey();onAccountChanged()}
     LaunchedEffect(mobileAuth.phase,connected){screen=when{
         connected->"success"
-        mobileAuth.phase=="mail"->"code"
+        mobileAuth.phase=="mail"->if(mobileAuth.isCodeRegistration())"registration-resume" else "code"
         mobileAuth.phase in listOf("passkey","login","enroll")->mobileAuth.phase
         else->"welcome"
     }}
@@ -65,6 +66,7 @@ import kotlinx.coroutines.withContext
                 CloudTitle("Dein Phoenix.\nÜberall verbunden.")
                 CloudText("Verbinde die App mit deinem Phoenix-Konto. Deine lokalen Profile bleiben auch ohne Anmeldung verfügbar.")
                 Action("Mit Passkey anmelden",enabled=!busy&&supportsPasskeys){screen="login";mobileAuth.login()}
+                Action("Mit Einmalcode registrieren",false,enabled=!busy&&supportsPasskeys&&!mobileAuth.hasPending()){screen="registration-code";code=""}
                 Action(if(mobileAuth.hasPending())"Registrierung fortsetzen" else "Konto erstellen",false,enabled=!busy&&supportsPasskeys){if(mobileAuth.hasPending())mobileAuth.resumePending() else screen="email"}
                 if(!supportsPasskeys)CloudText("Passkeys benötigen Android 9 oder neuer. Du kannst die App weiterhin per QR-Code verbinden.")
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
@@ -77,6 +79,21 @@ import kotlinx.coroutines.withContext
                 if(BuildConfig.DEBUG)TextButton(onClick={mobileAuth.selectEnvironment(if(mobileAuth.environment=="preview")"production" else "preview")},enabled=!busy&&!mobileAuth.hasPending()){
                     Text("Umgebung: ${if(mobileAuth.environment=="preview")"Preview" else "Produktion"}",fontSize=11.sp,color=Muted)
                 }
+            }
+            "registration-resume"->{
+                CloudTitle("Einrichtung\nfortsetzen.")
+                CloudText("Dein Einmalcode und der begonnene Einrichtungsvorgang sind auf diesem Gerät geschützt gespeichert. Wiederhole die Bestätigung bei einem Verbindungsfehler.")
+                CloudNote(mobileAuth.email.removeSuffix("@users.phoenix.invalid"))
+                Action("Registrierung fortsetzen",enabled=!busy){mobileAuth.resumeRegistration()}
+                CloudText("Nach 15 Minuten brauchst du die Hilfe deines Betreibers, falls die Passkey-Einrichtung noch nicht abgeschlossen ist.")
+            }
+            "registration-code"->{
+                CloudTitle("Dein Zugang.\nOhne E-Mail-Adresse.")
+                CloudText("Gib den Einmalcode aus Phoenix License Studio ein und wähle deinen Benutzernamen. Danach erstellst du einen Passkey.")
+                OutlinedTextField(registrationName,{registrationName=it.take(32)},label={Text("Benutzername")},singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(code,{code=it.trim().take(43)},label={Text("Einmalcode")},singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
+                Action("Einmalcode einlösen",enabled=!busy&&registrationName.isNotBlank()&&code.length==43){mobileAuth.redeemRegistrationCode(registrationName,code);code=""}
+                CloudNote("Der Code ist einmal gültig und läuft nach 24 Stunden ab. Produktfreigaben vergibt der Betreiber separat.")
             }
             "email"->{
                 CloudTitle("Beginnen wir mit\ndeiner E-Mail.")
@@ -102,7 +119,7 @@ import kotlinx.coroutines.withContext
             "passkey"->{
                 CloudTitle("Dein Schlüssel\nzu Phoenix Cloud.")
                 CloudText("Erstelle einen Passkey. Bei der Anmeldung bestätigst du mit Fingerabdruck, Gesicht oder deiner Gerätesperre.")
-                CloudNote("${mobileAuth.email}\nE-Mail-Adresse bestätigt")
+                CloudNote(if(mobileAuth.email.endsWith("@users.phoenix.invalid"))"${mobileAuth.email.removeSuffix("@users.phoenix.invalid")}\nEinrichtung freigegeben" else "${mobileAuth.email}\nE-Mail-Adresse bestätigt")
                 Action("Passkey erstellen",enabled=!busy){mobileAuth.createPasskey()}
                 CloudNote("Deine Biometrie bleibt auf dem Gerät.\nPhoenix erhält weder deinen Fingerabdruck noch deine Geräte-PIN.")
                 CloudText("Android öffnet dafür einen Systemdialog.")

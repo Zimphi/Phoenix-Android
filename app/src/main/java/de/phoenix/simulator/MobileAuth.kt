@@ -26,24 +26,27 @@ internal class MobileAuth(private val activity:Activity) {
     private var setupToken:String?=null
     private var expiresAt=0L
     private var pairingUri:String?=null
+    private var registrationCode:String?=null
     private val scope=MainScope()
     private val credentials=CredentialManager.create(activity)
     private val device=PkiDevice(activity.applicationContext)
     private val saved=PendingCloudSignup(activity.applicationContext)
     private val origin get()=if(environment=="preview")"https://preview.epassport-simulator.de" else "https://epassport-simulator.de"
+    fun isCodeRegistration()=registrationCode!=null
     fun hasPending()=installationSecret!=null||pairingUri!=null
     init {
         saved.read()?.let{state->
             if(state.optLong("expires")>System.currentTimeMillis()-86400000&&state.optString("environment") in listOf("production","preview")){
                 environment=state.getString("environment");email=state.optString("email");expiresAt=state.getLong("expires")
                 installationSecret=state.optString("secret").takeIf{it.isNotBlank()};pairingUri=state.optString("pairing").takeIf{it.isNotBlank()}
+                registrationCode=state.optString("registration_code").takeIf{it.isNotBlank()}
                 phase=if(pairingUri!=null)"enroll" else "mail";recovered=true
                 message="Offene Registrierung wiederhergestellt."
             }else saved.clear()
         }
     }
     private fun savePending(){saved.save(JSONObject().put("environment",environment).put("email",email).put("secret",installationSecret?:"")
-        .put("pairing",pairingUri?:"").put("expires",expiresAt))}
+        .put("pairing",pairingUri?:"").put("expires",expiresAt).put("registration_code",registrationCode?:""))}
 
     fun selectEnvironment(value:String){check(!busy&&phase=="idle"&&!hasPending());require(value in listOf("preview","production"));environment=value}
     fun editEmail(value:String){if(!busy&&phase=="idle"&&!hasPending())email=value.take(254)}
@@ -91,6 +94,10 @@ internal class MobileAuth(private val activity:Activity) {
     private suspend fun confirm(otp:String?=null,tokenHash:String?=null){
         check(phase=="mail"&&System.currentTimeMillis()<expiresAt)
         val secret=installationSecret?:error("Registration expired")
+        if(registrationCode!=null){
+            setupToken=request("code/redeem",JSONObject().put("username",email.removeSuffix("@users.phoenix.invalid")).put("code",registrationCode).put("secret",secret)).getString("setup_token")
+            phase="passkey";recovered=false;message="Einmalcode bestätigt. Erstelle jetzt deinen Passkey.";return
+        }
         val body=JSONObject().put("email",email).put("secret",secret)
         if(otp!=null){require(otp.matches(Regex("[0-9]{6,10}")));body.put("otp",otp)}
         else if(tokenHash!=null){require(tokenHash.matches(Regex("[0-9a-fA-F]{64}")));body.put("token_hash",tokenHash)}
@@ -98,6 +105,14 @@ internal class MobileAuth(private val activity:Activity) {
         phase="passkey";recovered=false;message="E-Mail bestätigt. Erstelle jetzt deinen Passkey."
     }
     fun confirmCode(code:String)=perform{confirm(otp=code)}
+    fun redeemRegistrationCode(username:String,code:String)=perform{
+        check(phase=="idle"&&!hasPending())
+        val name=username.trim().lowercase(java.util.Locale.ROOT)
+        require(name.matches(Regex("[a-z0-9][a-z0-9_.-]{2,31}"))&&code.matches(Regex("[A-Za-z0-9_-]{43}")))
+        email="$name@users.phoenix.invalid";registrationCode=code
+        installationSecret=Base64.encodeToString(ByteArray(32).also{SecureRandom().nextBytes(it)},Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        expiresAt=System.currentTimeMillis()+900000;phase="mail";savePending();confirm()
+    }
     fun resumeRegistration()=perform{confirm()}
     fun acceptLink(raw:String){
         opened++
@@ -147,9 +162,9 @@ internal class MobileAuth(private val activity:Activity) {
     fun retryEnrollment()=perform{finishEnrollment()}
     fun reset(){if(busy)return;setupToken=null;phase="idle";message=if(hasPending())"Deine Registrierung bleibt für später gespeichert." else ""}
     fun resumePending(){if(busy||!hasPending())return;phase=if(pairingUri!=null)"enroll" else "mail";recovered=true;message=""}
-    fun changeEmail(){if(busy)return;saved.clear();installationSecret=null;setupToken=null;pairingUri=null;expiresAt=0;phase="idle";email="";recovered=false;message=""}
-    private fun clearPending(){saved.remove(email,environment);installationSecret=null;setupToken=null;pairingUri=null;expiresAt=0;phase="idle";message="";recovered=false;saved.clear()}
-    fun close(){scope.cancel();installationSecret=null;setupToken=null;pairingUri=null}
+    fun changeEmail(){if(busy)return;saved.clear();installationSecret=null;setupToken=null;pairingUri=null;registrationCode=null;expiresAt=0;phase="idle";email="";recovered=false;message=""}
+    private fun clearPending(){saved.remove(email,environment);installationSecret=null;setupToken=null;pairingUri=null;registrationCode=null;expiresAt=0;phase="idle";message="";recovered=false;saved.clear()}
+    fun close(){scope.cancel();registrationCode=null;installationSecret=null;setupToken=null;pairingUri=null}
     companion object {
         internal fun attempt(secret:String)=MessageDigest.getInstance("SHA-256").digest(secret.toByteArray(Charsets.US_ASCII)).joinToString(""){"%02x".format(it)}
         internal fun callback(raw:String,origin:String,pending:String):String {
