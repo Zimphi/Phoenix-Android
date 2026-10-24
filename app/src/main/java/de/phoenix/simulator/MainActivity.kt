@@ -35,7 +35,7 @@ class MainActivity:ComponentActivity() {
     override fun onNewIntent(intent:Intent){super.onNewIntent(intent);consumeAuthIntent(intent)}
     private fun consumeAuthIntent(value:Intent){value.data?.let{mobileAuth.acceptLink(it.toString());value.data=null}}
     override fun onDestroy(){mobileAuth.close();super.onDestroy()}
-    override fun onResume(){super.onResume();CardService.foreground(true);val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,CardService::class.java))}
+    override fun onResume(){super.onResume();CardService.foreground(true);val adapter=NfcAdapter.getDefaultAdapter(this);if(adapter!=null&&packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(adapter).setPreferredService(this,ComponentName(this,if(NfcTestCardService.active())NfcTestCardService::class.java else CardService::class.java))}
     override fun onPause(){CardService.foreground(false);RemoteReader.stop();NfcAdapter.getDefaultAdapter(this)?.let{if(packageManager.hasSystemFeature("android.hardware.nfc.hce"))CardEmulation.getInstance(it).unsetPreferredService(this)};super.onPause()}
 }
 
@@ -238,7 +238,7 @@ class MainActivity:ComponentActivity() {
     val active=if(page in listOf("Editor","Profile","Profilliste"))"Profile" else if(page=="Simulation")"Simulation" else "Über"
     if(startup){Startup();return}
     Column(Modifier.fillMaxSize().background(Page).statusBarsPadding().semantics{testTagsAsResourceId=true}) {
-        if(page!="Editor")Row(Modifier.fillMaxWidth().height(if(page=="Profile")96.dp else 56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
+        if(page!="Editor"&&page!="NFC-Test")Row(Modifier.fillMaxWidth().height(if(page=="Profile")96.dp else 56.dp).padding(horizontal=Inset),verticalAlignment=Alignment.CenterVertically) {
             if(page=="Profile"||page=="Simulation") {
                 Brand(Modifier.size(if(page=="Profile")72.dp else 34.dp,if(page=="Profile")86.dp else 42.dp));Spacer(Modifier.width(12.dp));Text("Phoenix",fontSize=if(page=="Profile")30.sp else 20.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=(-.7).sp,color=Navy,modifier=Modifier.weight(1f))
             }else{
@@ -285,7 +285,8 @@ class MainActivity:ComponentActivity() {
                         scope.launch{withContext(Dispatchers.IO){runCatching{account.disconnect()}}.onSuccess{identity=JSONObject();page="Einstellungen"}.onFailure{message=it.message};accountBusy=false}
                     }
                     "Über"->About(components)
-                    "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"},{page="Cloud-Anbindung"})
+                    "Einstellungen"->Settings({legal=it},{page="IFD-Schnittstelle"},{page="Cloud-Anbindung"},{page="NFC-Test"})
+                    "NFC-Test"->NfcTestScreen{page="Einstellungen"}
                     "Cloud-Anbindung"->Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())){PkiDeviceSettings(identity,mobileAuth,{page="Profile"}){identity=account.identity()}}
                     "IFD-Schnittstelle"->ReaderSettings(remoteState,pairBusy,::pairReader,{
                         scope.launch{withContext(Dispatchers.IO){NativeCore.call(JSONObject().put("op","ifd_stop"))};remoteState=JSONObject()}
@@ -300,7 +301,7 @@ class MainActivity:ComponentActivity() {
                 }
             }
         }
-        Navigation(active){page=it}
+        if(page!="NFC-Test")Navigation(active){page=it}
     }
     if(simulationPicker)SimulationProfilePicker(store?.profiles?:emptyList(),{simulationPicker=false}){profile->
         selectSimulation(profile)

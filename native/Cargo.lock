@@ -1367,6 +1367,7 @@ dependencies = [
  "libc",
  "openssl",
  "phoenix-eid-core",
+ "phoenix-epassport-core",
  "phoenix-license-verifier",
  "phoenix-simulator",
  "rustls-platform-verifier",

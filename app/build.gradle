@@ -11,15 +11,19 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.1.0-dev'
-        testInstrumentationRunner project.hasProperty('authTest') ? 'de.phoenix.simulator.MobileAuthInstrumentation' : 'de.phoenix.simulator.SmokeInstrumentation'
+        testInstrumentationRunner project.hasProperty('authTest') ? 'de.phoenix.simulator.MobileAuthInstrumentation' : project.hasProperty('nfcTest') ? 'de.phoenix.simulator.NfcSessionInstrumentation' : 'de.phoenix.simulator.SmokeInstrumentation'
     }
     buildFeatures { buildConfig true; compose true }
     kotlinOptions { jvmTarget = "17" }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-    packaging { jniLibs { useLegacyPackaging = false; excludes += ['**/libphoenix_android *.so'] } }
+    packaging {
+        jniLibs { useLegacyPackaging = false; excludes += ['**/libphoenix_android *.so'] }
+        resources { excludes += ['META-INF/versions/9/OSGI-INF/MANIFEST.MF'] }
+    }
 }
 
 dependencies {
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.83'
     implementation 'androidx.credentials:credentials:1.5.0'
     implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
@@ -33,3 +37,21 @@ dependencies {
 if (System.getenv("PHOENIX_RUSTLS_MAVEN")) {
     dependencies { implementation 'rustls:rustls-platform-verifier:0.1.1' }
 }
+
+// Export the actual resolved runtime versions for the two-phone diagnostic report.
+def nfcLibraryAssets = layout.buildDirectory.dir('generated/nfc-test-assets')
+android.sourceSets.main.assets.srcDir(nfcLibraryAssets)
+tasks.register('nfcTestDependencyInventory') {
+    def inventory = nfcLibraryAssets.map { it.file('nfc-test-libraries.json') }
+    inputs.files(configurations.debugRuntimeClasspath)
+    outputs.file(inventory)
+    doLast {
+        def rows = configurations.debugRuntimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+            [group: it.moduleVersion.id.group, name: it.name, version: it.moduleVersion.id.version]
+        }.unique().sort { a,b -> (a.group + ':' + a.name) <=> (b.group + ':' + b.name) }
+        def destination = inventory.get().asFile
+        destination.parentFile.mkdirs()
+        destination.text = groovy.json.JsonOutput.toJson(rows)
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'nfcTestDependencyInventory' }

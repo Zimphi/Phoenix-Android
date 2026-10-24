@@ -36,3 +36,12 @@ data and German translations come from Debian iso-codes via pycountry
 (LGPL-2.1-or-later; see `licenses/LGPL-2.1.txt`). The original JSON, source
 repository and integrity hash are retained. Utopia is a separate synthetic UI
 option and is not presented as an ISO country.
+
+## NFC diagnostic code pairing
+
+The Android app uses Bouncy Castle Java 1.83 (`bcprov-jdk18on`) for the
+J-PAKE password-authenticated key exchange. Bouncy Castle is distributed under
+its MIT-style license: https://www.bouncycastle.org/licence.html .
+The exact dependency's license and copyright notice is retained in
+`licenses/BouncyCastle.txt`.
+The six-digit code is never transmitted as an authentication password.

@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application android:label="Phoenix" android:icon="@drawable/phoenix_favicon" android:theme="@style/AppTheme" android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="false">
@@ -18,6 +19,10 @@
         <service android:name=".CardService" android:exported="true" android:permission="android.permission.BIND_NFC_SERVICE">
             <intent-filter><action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE"/></intent-filter>
             <meta-data android:name="android.nfc.cardemulation.host_apdu_service" android:resource="@xml/apdu_service"/>
+        </service>
+        <service android:name=".NfcTestCardService" android:exported="true" android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter><action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" /></intent-filter>
+            <meta-data android:name="android.nfc.cardemulation.host_apdu_service" android:resource="@xml/nfc_test_service" />
         </service>
     </application>
 </manifest>

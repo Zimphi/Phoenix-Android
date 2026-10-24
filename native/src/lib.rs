@@ -8,6 +8,41 @@ use std::{fs, io::Write, path::Path, sync::{Mutex, OnceLock}};
 use zeroize::Zeroizing;
 
 mod activation;
+mod nfc_test;
+// Compile the pinned terminal modules unchanged; sharing dependencies preserves one license verifier.
+#[path = "../../.private/terminal/src/terminal.rs"]
+pub mod terminal;
+#[path = "../../.private/terminal/src/certificates.rs"]
+pub mod certificates;
+#[path = "../../.private/terminal/src/files.rs"]
+pub mod files;
+#[path = "../../.private/terminal/src/inspection.rs"]
+pub mod inspection;
+#[path = "../../.private/terminal/src/passive_authentication.rs"]
+pub mod passive_authentication;
+#[path = "../../.private/terminal/src/active_authentication.rs"]
+mod active_authentication;
+#[path = "../../.private/terminal/src/cam.rs"]
+mod cam;
+#[path = "../../.private/terminal/src/cav4_authentication.rs"]
+mod cav4_authentication;
+#[path = "../../.private/terminal/src/chip_authentication.rs"]
+mod chip_authentication;
+#[path = "../../.private/terminal/src/diagnostics.rs"]
+mod diagnostics;
+#[path = "../../.private/terminal/src/secure_messaging.rs"]
+mod secure_messaging;
+#[path = "../../.private/terminal/src/ta_v3.rs"]
+mod ta_v3;
+#[path = "../../.private/terminal/src/terminal_authentication.rs"]
+mod terminal_authentication;
+#[path = "../../.private/terminal/src/pace_selection.rs"]
+mod pace_selection;
+#[path = "../../.private/terminal/src/icao_classical.rs"]
+mod icao_classical;
+#[path = "../../.private/terminal/dependencies/epassport/src/pace_group.rs"]
+mod pace_group;
+
 mod remote;
 mod remote_identity;
 static READER: Mutex<Option<remote::Reader>> = Mutex::new(None);
@@ -16,6 +51,7 @@ extern crate cav4_local_prototype as phoenix_pqc;
 #[path = "../../.private/terminal/src/lds.rs"]
 #[allow(dead_code)]
 mod passport_lds;
+use self::passport_lds as lds;
 mod provision;
 static ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
 static RUNTIME: OnceLock<Mutex<(Native,Option<phoenix_eid_core::application::Application>)>> = OnceLock::new();
@@ -34,6 +70,8 @@ enum Request {
     IfdStop,
     TrialPrepare,
     TrialReceive {delivery:Value},
+    TrialTerminalPrepare,
+    TrialTerminalReceive {delivery:Value},
     Mount {kind:String, id:String},
     MountDraft {draft:Value},
     Apdu {command:String},
@@ -54,7 +92,7 @@ fn dispatch(request: &str) -> Result<Value> {
             _=>{if let Some(mut reader)=reader.take(){reader.stop()?;}if matches!(request,Request::IfdForget){remote::forget_peers(ROOT.get().context("App root missing")?)?;}Ok(json!({"running":false}))}
         };
     }
-    if !matches!(request,Request::IfdStart{..}|Request::IfdPair|Request::Inventory|Request::TrialPrepare|Request::TrialReceive{..}) {
+    if !matches!(request,Request::IfdStart{..}|Request::IfdPair|Request::Inventory|Request::TrialPrepare|Request::TrialReceive{..}|Request::TrialTerminalPrepare|Request::TrialTerminalReceive{..}) {
         ensure!(READER.lock().map_err(|_|anyhow::anyhow!("IFD lock"))?.is_none(),"Zuerst den WLAN-Kartenleser beenden");
     }
     let mut native=RUNTIME.get().context("Native Laufzeit nicht initialisiert")?.lock().map_err(|_|anyhow::anyhow!("Core-Zustand nicht verfügbar"))?;
@@ -82,6 +120,8 @@ fn dispatch(request: &str) -> Result<Value> {
         },
         Request::TrialPrepare => activation::prepare(ROOT.get().context("App root missing")?),
         Request::TrialReceive {delivery} => activation::receive(ROOT.get().context("App root missing")?,delivery),
+        Request::TrialTerminalPrepare => activation::prepare_terminal(ROOT.get().context("App root missing")?),
+        Request::TrialTerminalReceive {delivery} => activation::receive_terminal(ROOT.get().context("App root missing")?,delivery),
         Request::Inventory => Ok(json!({"eid":native.inventory()?,"epassport":native.passport_inventory()?})),
         Request::EditorState{id} => {*application=None;native.close();provision::editor_state(ROOT.get().context("App root missing")?,&id)},
         Request::RiUpdate{id,frozen,regenerate,keys} => {*application=None;native.close();provision::ri_update(ROOT.get().context("App root missing")?,&id,frozen,regenerate,keys)},
@@ -149,3 +189,13 @@ pub extern "system" fn Java_de_phoenix_simulator_NativeCore_initializeNative(mut
     #[test] fn rejects_unknown_core_and_unknown_request_fields(){assert!(serde_json::from_str::<Request>(r#"{"op":"mount","kind":"eid","id":"x","owner":true}"#).is_err());assert!(serde_json::from_str::<Request>(r#"{"op":"owner"}"#).is_err());}
     #[test] fn cannot_process_apdus_without_initialized_native_runtime(){assert!(dispatch(r#"{"op":"apdu","command":"00a40400"}"#).is_err());}
 }
+
+#[cfg(test)]
+#[path = "../../.private/terminal/src/inspection_tests.rs"]
+mod inspection_tests;
+#[cfg(test)]
+#[path = "../../.private/terminal/src/ta_tests.rs"]
+mod ta_tests;
+#[cfg(test)]
+#[path = "../../.private/terminal/src/pa_tests.rs"]
+mod pa_tests;

@@ -112,7 +112,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun Settings(onLegal:(String)->Unit,onReader:()->Unit,onPki:()->Unit) {
+@Composable internal fun Settings(onLegal:(String)->Unit,onReader:()->Unit,onPki:()->Unit,onNfcTest:()->Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Text("Verbindungen",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Navy)
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Pale).clickable(onClick=onPki).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -128,6 +128,14 @@ import org.json.JSONObject
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Text("IFD-Schnittstelle",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=Navy)
                 Text("Smartphone als Kartenleser · Kopplung",fontSize=12.sp,color=Muted)
+            }
+            Glyph("chevron",Muted,Modifier.size(19.dp))
+        }
+        Row(Modifier.fillMaxWidth().testTag("settings-nfc-test").clip(RoundedCornerShape(14.dp)).background(Pale).clickable(onClick=onNfcTest).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            Glyph("contactless",Blue,Modifier.size(30.dp))
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text("NFC-Test",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=Navy)
+                Text("Mit einem zweiten Telefon prüfen",fontSize=12.sp,color=Muted)
             }
             Glyph("chevron",Muted,Modifier.size(19.dp))
         }

@@ -47,23 +47,32 @@ fn uuid()->Result<String>{
     let h=bytes.iter().map(|b|format!("{b:02x}")).collect::<String>();
     Ok(format!("{}-{}-{}-{}-{}",&h[..8],&h[8..12],&h[12..16],&h[16..20],&h[20..]))
 }
-pub fn prepare(root:&Path)->Result<Value>{
-    let state=if root.join("trial-state.json").exists(){load(root)?}else{
-        for product in ["Phoenix-ePassport-Core","Phoenix-eID"] {
+fn prepare_products(root:&Path,state_root:&Path,products:&[&str],installed:&[&str])->Result<Value>{
+    fs::create_dir_all(state_root)?;
+    let state=if state_root.join("trial-state.json").exists(){load(state_root)?}else{
+        for product in installed {
             ensure!(!root.join(product).exists(),"Automatic trial is first-start only");
         }
         let device=phoenix_license_native::device_ids().context("Native device identity")?.into_iter().next().context("Device binding missing")?;
         let (lower,_)=phoenix_license_native::trusted_time_bounds().context("Authenticated time initialization")?;
         let created=chrono::DateTime::from_timestamp((lower/1000).try_into()?,0).context("Trusted activation time")?.to_rfc3339_opts(chrono::SecondsFormat::Secs,true);
-        let batch=json!({"type":"phoenix-license-request","version":2,"request_id":uuid()?,"created_at":created,"customer_reference":{"anonymous":true},"device_id":device,"products":[{"product":"phoenix-core","request_id":uuid()?},{"product":"phoenix-eid","request_id":uuid()?}],"license_type":"trial"});
-        let state=LegacyActivation::import(batch).context("Prepare trial request")?;save(root,&state,true).context("Persist trial request")?;state
+        let products=products.iter().map(|product|Ok(json!({"product":product,"request_id":uuid()?}))).collect::<Result<Vec<_>>>()?;
+        let batch=json!({"type":"phoenix-license-request","version":2,"request_id":uuid()?,"created_at":created,"customer_reference":{"anonymous":true},"device_id":device,"products":products,"license_type":"trial"});
+        let state=LegacyActivation::import(batch).context("Prepare trial request")?;save(state_root,&state,true).context("Persist trial request")?;state
     };
     if state.summary()?["license_received"]==true {state.activate()?;Ok(json!({"active":true}))}
     else {Ok(json!({"active":false,"request":state.trial_hash_request()?}))}
 }
+pub fn prepare(root:&Path)->Result<Value>{prepare_products(root,root,&["phoenix-core","phoenix-eid"],&["Phoenix-ePassport-Core","Phoenix-eID"])}
 pub fn receive(root:&Path,delivery:Value)->Result<Value>{
     let mut state=load(root)?;
     state.receive(delivery)?;
     save(root,&state,false)?;
     state.activate()
 }
+
+pub fn prepare_terminal(root:&Path)->Result<Value>{
+    if [0x101,0x201,0x401].into_iter().all(phoenix_license_native::authorize_operation){return Ok(json!({"active":true}));}
+    prepare_products(root,&root.join("terminal-activation"),&["phoenix-is-terminal"],&["Phoenix-IS-Terminal"])
+}
+pub fn receive_terminal(root:&Path,delivery:Value)->Result<Value>{receive(&root.join("terminal-activation"),delivery)}
